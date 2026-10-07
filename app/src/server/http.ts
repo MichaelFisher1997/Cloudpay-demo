@@ -1,9 +1,7 @@
-import { authInstance } from "./auth";
+import { authenticatedOwner, authSettings } from "./auth";
 import { config, sameOrigin } from "./config";
 export async function owner(req: Request): Promise<string | null> {
-  const auth = await authInstance();
-  const session = await auth.api.getSession({ headers: req.headers });
-  return session?.user.id ?? null;
+  return authenticatedOwner(req, authSettings());
 }
 export function forbiddenMutation(req: Request): Response | null {
   return sameOrigin(req, config().origin)

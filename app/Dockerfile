@@ -17,6 +17,7 @@ COPY --from=build /app/.output ./.output
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/src ./src
 COPY --from=build /app/scripts ./scripts
+COPY --from=build /app/clerk ./clerk
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /tmp/rds-global-bundle.pem /etc/ssl/certs/rds-global-bundle.pem
 USER 10001:10001

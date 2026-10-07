@@ -1,67 +1,95 @@
-import { betterAuth } from "better-auth";
-import { APIError } from "better-auth/api";
-import type { Pool } from "pg";
-import { config } from "./config";
-import { runtime } from "./db";
+import { verifyToken } from "@clerk/backend";
+import { createPublicKey } from "node:crypto";
+import { config, required } from "./config";
 
-export type AuthSettings = Pick<
-  ReturnType<typeof config>,
-  "origin" | "secure" | "invites"
->;
-
-export function createAuth(
-  db: Pool,
-  authSecret: string,
-  settings: AuthSettings,
-  migrating = false,
-) {
-  return betterAuth({
-    database: db,
-    secret: authSecret,
-    baseURL: settings.origin,
-    trustedOrigins: [settings.origin],
-    emailAndPassword: { enabled: true },
-    advanced: {
-      defaultCookieAttributes: {
-        secure: settings.secure,
-        sameSite: "lax",
-        httpOnly: true,
-      },
-      database: { validateSchema: !migrating },
-    },
-    rateLimit: {
-      enabled: true,
-      storage: "database",
-      customRules: {
-        "/sign-in/email": { window: 60, max: 5 },
-        "/sign-up/email": { window: 60, max: 5 },
-      },
-    },
-    databaseHooks: {
-      user: {
-        create: {
-          before: async (user) => {
-            if (!settings.invites.has(user.email.toLowerCase())) {
-              throw new APIError("FORBIDDEN", {
-                message: "Invitation required",
-              });
-            }
-            return { data: user };
-          },
-        },
-      },
-    },
-  });
+export interface AuthSettings {
+  origin: string;
+  issuer: string;
+  publishableKey: string;
+  jwtKey: string;
+  allowedEmails: Set<string>;
 }
 
-let instance: Promise<ReturnType<typeof createAuth>> | undefined;
-export function authInstance() {
-  return (instance ??= (async () => {
-    const settings = config();
-    const { db, authSecret } = await runtime();
-    return createAuth(db, authSecret, settings);
-  })().catch((error) => {
-    instance = undefined;
-    throw error;
-  }));
+export function authSettings(
+  env: Record<string, string | undefined> = process.env,
+): AuthSettings {
+  const c = config(env);
+  const publishableKey = required(
+    env.CLERK_PUBLISHABLE_KEY,
+    "CLERK_PUBLISHABLE_KEY",
+  );
+  const prefix = c.environment === "dev" ? "pk_test_" : "pk_live_";
+  if (!publishableKey.startsWith(prefix))
+    throw new Error("Wrong Clerk environment");
+  const host = Buffer.from(publishableKey.slice(prefix.length), "base64")
+    .toString("utf8")
+    .replace(/\$$/, "");
+  const issuer = required(env.CLERK_ISSUER, "CLERK_ISSUER");
+  if (
+    issuer !== `https://${host}` ||
+    (c.environment === "dev" &&
+      !/^[a-z0-9-]+\.clerk\.accounts\.dev$/.test(host))
+  )
+    throw new Error("Wrong Clerk issuer");
+  const jwtKey = required(env.CLERK_JWT_KEY, "CLERK_JWT_KEY");
+  const key = createPublicKey(jwtKey);
+  if (
+    !jwtKey.startsWith("-----BEGIN PUBLIC KEY-----") ||
+    key.asymmetricKeyType !== "rsa" ||
+    (key.asymmetricKeyDetails?.modulusLength ?? 0) < 2048
+  )
+    throw new Error("Invalid Clerk public key");
+  const allowedEmails = new Set(
+    (env.CLERK_ALLOWED_EMAILS ?? "")
+      .split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  );
+  if (
+    !allowedEmails.size ||
+    [...allowedEmails].some(
+      (email) => !/^[^@\s*]+@[^@\s*]+\.[^@\s*]+$/.test(email),
+    )
+  )
+    throw new Error("A named-email Clerk allowlist is required");
+  return { origin: c.origin, issuer, publishableKey, jwtKey, allowedEmails };
+}
+
+export async function authenticatedOwner(
+  req: Request,
+  settings: AuthSettings,
+): Promise<string | null> {
+  // Explicit bearer tokens avoid Clerk's server-side handshake/API calls in the
+  // endpoint-only VPC. Never accept old cookies, user IDs or client email headers.
+  const token = /^Bearer ([A-Za-z0-9_.-]{1,8192})$/.exec(
+    req.headers.get("authorization") ?? "",
+  )?.[1];
+  if (!token) return null;
+  try {
+    const claims = await verifyToken(token, {
+      jwtKey: settings.jwtKey,
+      authorizedParties: [settings.origin],
+      clockSkewInMs: 1_000,
+    });
+    if (
+      claims.iss !== settings.issuer ||
+      claims.azp !== settings.origin ||
+      !/^user_[A-Za-z0-9]+$/.test(claims.sub) ||
+      typeof claims.sid !== "string" ||
+      !/^sess_[A-Za-z0-9]+$/.test(claims.sid) ||
+      (claims.sts !== undefined && claims.sts !== "active") ||
+      typeof claims.iat !== "number" ||
+      typeof claims.exp !== "number" ||
+      claims.exp - claims.iat > 65 ||
+      claims.exp <= claims.iat ||
+      claims.email_verified !== true ||
+      typeof claims.email !== "string" ||
+      !settings.allowedEmails.has(claims.email.toLowerCase())
+    )
+      return null;
+    return claims.sub;
+  } catch {
+    // Do not log tokens, Clerk errors, claims or keys.
+    return null;
+  }
 }

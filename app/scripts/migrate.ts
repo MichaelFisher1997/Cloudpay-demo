@@ -1,8 +1,10 @@
 import { pool, secret } from "../src/server/db";
 import { required } from "../src/server/config";
 import { migrate } from "../src/server/jobs";
+import { approvedDevReset } from "../src/server/dev-reset";
 
 async function main() {
+  const reset = approvedDevReset(process.env);
   const region = required(process.env.AWS_REGION, "AWS_REGION");
   const credentials = await secret(
     required(process.env.MIGRATION_SECRET_ARN, "MIGRATION_SECRET_ARN"),
@@ -15,7 +17,7 @@ async function main() {
     { username: credentials.username!, password: credentials.password! },
   );
   try {
-    await migrate(db);
+    await migrate(db, { resetDevData: reset });
     console.log("Schema migrated");
   } finally {
     await db.end();

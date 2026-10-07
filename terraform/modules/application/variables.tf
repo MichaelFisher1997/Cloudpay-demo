@@ -69,12 +69,29 @@ variable "release" {
     image_digest                     = optional(string)
     retained_image_digests           = optional(set(string), [])
     retained_bootstrap_image_digests = optional(set(string), [])
-    bootstrap_enabled                = optional(bool, false)
-    bootstrap_retained               = optional(bool, false)
-    service_enabled                  = optional(bool, false)
-    database_ready                   = optional(bool, false)
+    retained_web_containers          = optional(map(string), {})
+    clerk_auth = optional(object({
+      publishable_key = string
+      issuer          = string
+      jwt_key         = string
+      allowed_emails  = list(string)
+    }))
+    bootstrap_enabled  = optional(bool, false)
+    bootstrap_retained = optional(bool, false)
+    service_enabled    = optional(bool, false)
+    database_ready     = optional(bool, false)
   })
   default = {}
+  validation {
+    condition = var.release.clerk_auth == null ? true : (
+      !var.production && startswith(var.release.clerk_auth.publishable_key, "pk_test_") &&
+      startswith(var.release.clerk_auth.jwt_key, "-----BEGIN PUBLIC KEY-----") &&
+      can(regex("^https://[a-z0-9-]+\\.clerk\\.accounts\\.dev$", var.release.clerk_auth.issuer)) &&
+      length(var.release.clerk_auth.allowed_emails) > 0 &&
+      alltrue([for email in var.release.clerk_auth.allowed_emails : can(regex("^[^@\\s*]+@[^@\\s*]+\\.[^@\\s*]+$", email))])
+    )
+    error_message = "This Clerk cutover is DEV-only and requires test/public keys and specific email addresses."
+  }
   validation {
     condition = (
       var.release.image_digest == null ||

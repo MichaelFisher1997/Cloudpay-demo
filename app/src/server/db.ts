@@ -42,19 +42,13 @@ export function pool(
   db.on("error", () => console.error("Idle PostgreSQL connection failed"));
   return db;
 }
-let instance: Promise<{ db: Pool; authSecret: string }> | undefined;
+let instance: Promise<{ db: Pool }> | undefined;
 export function runtime() {
   return (instance ??= (async () => {
     const c = config();
     const credentials = c.localUrl
-      ? {
-          username: "",
-          password: "",
-          auth_secret: process.env.LOCAL_AUTH_SECRET ?? "",
-        }
+      ? { username: "", password: "" }
       : await secret(c.secretArn, c.region);
-    if (!credentials.auth_secret || credentials.auth_secret.length < 32)
-      throw new Error("auth_secret missing/short");
     return {
       db: pool(
         c.host,
@@ -63,7 +57,6 @@ export function runtime() {
         { username: credentials.username!, password: credentials.password! },
         c.localUrl,
       ),
-      authSecret: credentials.auth_secret,
     };
   })().catch((error) => {
     instance = undefined;

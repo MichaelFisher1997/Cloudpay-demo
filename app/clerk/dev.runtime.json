@@ -1,0 +1,9 @@
+{
+  "applicationId": "app_3KNzZ49PwkO5TQ7qojosOujI4z3",
+  "instanceId": "ins_3KNzZ12dSXDsRBzB32ZAYJQXGCQ",
+  "environment": "development",
+  "publishableKey": "pk_test_bWFnbmV0aWMtemVicmEtOTIyMi5jbGVyay5hY2NvdW50cy5kZXYk",
+  "issuer": "https://magnetic-zebra-9222.clerk.accounts.dev",
+  "jwtKey": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxYp5pzKmrlJYbWz9l1at\naNKZSE8il2Tx2s7I9fcsHgJRWgC6duA4y4GUTvwryTY17AHfv4fdXwLj4b9ku5M9\nqd3sBhdE69bDSTmc3d3lgXjFnVkwCB1iYrpSZ3jnaJBY7iy/iysk0RwfMtLakuuf\nggHalpl0NYue3Lhacs+5C6XRY0UQtIvpfXJvwuxVQbft7QkXRZ3LHKC7cOeudolv\nYQV0pM7u7OAOs2ueCncnhwT4knLg6boMUBBiPYG19DpzwoeaHoNPLqEsTvj1ORbU\niDVx/4824bHrDkEkhDUK9UE4I4rwL1nk/zMaHVNAvzkt0eiK2LtZ4BDsKErw3wwj\nmwIDAQAB\n-----END PUBLIC KEY-----\n",
+  "allowedEmails": ["contact@michaelfisher.tech"]
+}

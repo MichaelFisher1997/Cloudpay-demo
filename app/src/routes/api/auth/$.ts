@@ -1,25 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { authInstance } from "../../../server/auth";
-import { forbiddenMutation, failure } from "../../../server/http";
-import { normalizeAlbClientIp } from "../../../server/alb-ip";
+import { forbiddenMutation } from "../../../server/http";
+const retired = () =>
+  Response.json(
+    { error: "Password sign-in is retired. Use Clerk Google sign-in." },
+    { status: 410 },
+  );
 export const Route = createFileRoute("/api/auth/$")({
   server: {
     handlers: {
-      GET: async ({ request }) => {
-        try {
-          return (await authInstance()).handler(normalizeAlbClientIp(request));
-        } catch (error) {
-          return failure(error);
-        }
-      },
+      GET: retired,
       POST: async ({ request }) => {
         const denied = forbiddenMutation(request);
         if (denied) return denied;
-        try {
-          return (await authInstance()).handler(normalizeAlbClientIp(request));
-        } catch (error) {
-          return failure(error);
-        }
+        return retired();
       },
     },
   },

@@ -1,5 +1,6 @@
 // No AWS calls or credentials. Inspect only our locally built image and own containers.
 import { randomBytes } from "node:crypto";
+import clerk from "../app/clerk/dev.runtime.json";
 
 const image = process.argv[2] ?? "godiffy:validation";
 if (!/^godiffy:(validation|local|final)$/.test(image))
@@ -61,6 +62,14 @@ async function run(environment: "dev" | "prod", origin: string) {
       "DATABASE_HOST=database.invalid",
       "--env",
       "DATABASE_SECRET_ARN=local-smoke-unused",
+      "--env",
+      `CLERK_PUBLISHABLE_KEY=${clerk.publishableKey}`,
+      "--env",
+      `CLERK_ISSUER=${clerk.issuer}`,
+      "--env",
+      `CLERK_JWT_KEY=${clerk.jwtKey}`,
+      "--env",
+      `CLERK_ALLOWED_EMAILS=${clerk.allowedEmails.join(",")}`,
       image,
     ]);
     started = true;

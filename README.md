@@ -6,6 +6,10 @@ GitHub Actions delivery—not application complexity or production certification
 
 ## Current status
 
+**Clerk DEV cutover is prepared:** Google sign-in with an exact verified-email
+allowlist replaces local passwords. The separately approved data reset runs only
+in the reviewed Actions release; [setup/access instructions](docs/clerk-dev.md).
+
 - **Deployed and verified:** dedicated Godiffy S3 Terraform backend, native state
   locking, versioning, encryption, and six bootstrap resources. Local backups retained.
 - **DEV is running:** [HTTP ALB URL](http://godiffy-dev-alb-1345285825.eu-west-2.elb.amazonaws.com).
@@ -25,14 +29,16 @@ GitHub Actions delivery—not application complexity or production certification
 - **GitHub validation passed:** [run 37690611200](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37690611200)
   tests/builds the actual committed implementation without AWS credentials.
 
-DEV is intentionally HTTP-only: use disposable passwords and non-sensitive images.
+DEV is intentionally HTTP-only: use non-sensitive images. Google credentials
+stay on Google's HTTPS pages, but gallery session tokens still cross HTTP.
 Production and domain/TLS work remain unauthorized. Do not interpret process-only
 health probes, local mocks or a scan as proof of production readiness.
 
 ## Five-minute interview demo
 
-1. Open the site; register `interview@godiffy.invalid` with a **disposable** password,
-   then upload/download/delete a non-sensitive image.
+1. After the Clerk release, open the site and use **Google sign-in** with an
+   allowlisted email; upload/download/delete a non-sensitive image. Add interviewers
+   individually using [the DEV access guide](docs/clerk-dev.md).
 2. Walk through `terraform/environments/dev` and the focused modules in
    `terraform/modules`: networking, storage, database and application.
 3. Show the Actions release's reviewed plan, successful apply and final **no-change**
@@ -58,8 +64,8 @@ flowchart LR
 
 Dev intentionally has one task, Single-AZ RDS, and one endpoint AZ. Production is
 designed for two task AZs, two minimum replicas, Multi-AZ RDS, and endpoints in both
-AZs. There are no NAT gateways, public task IPs, Redis, Kubernetes, or external
-runtime SaaS dependencies in DEV.
+AZs. There are no NAT gateways, public task IPs, Redis or Kubernetes in DEV.
+Clerk authentication is browser-side; the private task verifies tokens offline.
 
 ## Review and operate
 
@@ -99,6 +105,6 @@ it does not need AWS credentials. The PostgreSQL test runs an isolated local
 container with ephemeral credentials and mocked AWS services, then stops only its
 own container. Docker build context is `app/`.
 
-Production registration is intentionally disabled: a dev email allowlist is not
-proof of inbox ownership. Actual AWS image-pull, database, S3 and ALB verification
+Production remains undeployed; DEV Google sign-in requires a verified email on
+the exact allowlist. Actual AWS image-pull, database, S3 and ALB verification
 is recorded separately from local tests in the deployment handoff.

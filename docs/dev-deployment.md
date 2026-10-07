@@ -1,5 +1,9 @@
 # DEV deployment handoff — 7 October 2026
 
+**Auth cutover pending:** [Clerk DEV notes](clerk-dev.md) track the newly configured
+Google sandbox and approved database reset. The release evidence below describes
+the prior password-auth deployment until the Clerk Actions cutover completes.
+
 ## Outcome: interview demo deployed; real HTTP/S3 smoke passed; Terraform converged
 
 **URL:** http://godiffy-dev-alb-1345285825.eu-west-2.elb.amazonaws.com

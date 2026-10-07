@@ -55,6 +55,12 @@ header {
   max-width: 430px;
   margin: 100px auto;
 }
+.clerk-signin {
+  margin: 30px 0 20px;
+}
+.clerk-signin > div {
+  max-width: 100%;
+}
 .eyebrow {
   color: #36845b;
   font-size: 11px;

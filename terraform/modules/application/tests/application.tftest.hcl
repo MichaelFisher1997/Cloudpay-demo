@@ -96,6 +96,27 @@ run "reject_mutable_image" {
   variables { release = { image_digest = "latest" } }
   expect_failures = [var.release]
 }
+run "clerk_release_keeps_old_web_configuration_immutable" {
+  command = plan
+  variables {
+    release = {
+      image_digest           = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      retained_image_digests = ["sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]
+      retained_web_containers = {
+        "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" = jsonencode([{ name = "web", image = "218549829565.dkr.ecr.eu-west-2.amazonaws.com/godiffy-dev-application@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", environment = [{ name = "INVITED_EMAILS", value = "old@example.invalid" }] }])
+      }
+      clerk_auth = { publishable_key = "pk_test_mock", issuer = "https://mock.clerk.accounts.dev", jwt_key = "-----BEGIN PUBLIC KEY-----\nmock", allowed_emails = ["allowed@example.invalid"] }
+    }
+  }
+  assert {
+    condition = (
+      aws_ecs_task_definition.web["sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"].container_definitions == var.release.retained_web_containers["sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"] &&
+      contains(jsondecode(aws_ecs_task_definition.web[var.release.image_digest].container_definitions)[0].environment, { name = "CLERK_ALLOWED_EMAILS", value = "allowed@example.invalid" }) &&
+      !strcontains(aws_ecs_task_definition.web[var.release.image_digest].container_definitions, "CLERK_SECRET_KEY")
+    )
+    error_message = "Clerk must affect only the new release, preserve history and never inject a secret key."
+  }
+}
 run "bootstrap_restricted_and_retained" {
   command = plan
   variables {

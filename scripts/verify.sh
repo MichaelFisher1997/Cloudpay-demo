@@ -36,7 +36,7 @@ cd app
 bun install --frozen-lockfile
 bun run format:check
 bun run typecheck
-bun node_modules/typescript/bin/tsc --noEmit --strict --skipLibCheck --target esnext --module preserve --moduleResolution bundler --types bun ../scripts/test-database.ts ../scripts/smoke-image.ts
+bun node_modules/typescript/bin/tsc --noEmit --strict --skipLibCheck --target esnext --module preserve --moduleResolution bundler --resolveJsonModule --types bun ../scripts/test-database.ts ../scripts/smoke-image.ts
 bun node_modules/.bin/prettier --check ../scripts/test-database.ts ../scripts/smoke-image.ts
 bun run test
 bun run build

@@ -212,6 +212,13 @@ class EmptyDatabaseRepairTests(unittest.TestCase):
 
 
 class ActionsJobTests(unittest.TestCase):
+    def test_reset_is_opt_in_migration_override_only(self):
+        self.assertEqual(job_module.job_overrides("migrate", False), {})
+        self.assertEqual(job_module.job_overrides("migrate", True), {"containerOverrides": [{"name": "migrate", "environment": [{"name": "GODIFFY_DEV_RESET_CONFIRMATION", "value": "reset-godiffy-dev-data-for-clerk"}]}]})
+        for job in ("bootstrap", "verify", "web"):
+            with self.assertRaises(RuntimeError):
+                job_module.job_overrides(job, True)
+
     def test_only_actions_may_run_private_jobs(self):
         target = {"account_id": "218549829565", "region": "eu-west-2", "environment": "dev", "cluster_name": "godiffy-dev-cluster"}
         identity = {"Account": "218549829565", "Arn": "arn:aws:sts::218549829565:assumed-role/cloudpay-demo-github-actions/test"}
@@ -292,14 +299,22 @@ class ImageScanTests(unittest.TestCase):
 class RevisionHistoryTests(unittest.TestCase):
     def test_retains_only_actual_bootstrap_history_not_every_release(self):
         old, current = "sha256:" + "a" * 64, "sha256:" + "b" * 64
+        containers = {digest: json.dumps([{"name": "web", "image": f"218549829565.dkr.ecr.eu-west-2.amazonaws.com/godiffy-dev-application@{digest}", "environment": [{"name": "INVITED_EMAILS", "value": "original@example.invalid"}]}]) for digest in (old, current)}
         state = {"resources": [
-            {"module": revision_module.MODULE, "type": "aws_ecs_task_definition", "name": "web", "instances": [{"index_key": old}, {"index_key": current}]},
+            {"module": revision_module.MODULE, "type": "aws_ecs_task_definition", "name": "web", "instances": [{"index_key": digest, "attributes": {"container_definitions": value}} for digest, value in containers.items()]},
             {"module": revision_module.MODULE, "type": "aws_ecs_task_definition", "name": "job", "instances": [{"index_key": old + "/bootstrap"}, {"index_key": current + "/migrate"}, {"index_key": current + "/verify"}]},
         ]}
-        self.assertEqual(revision_module.revision_inputs(state), {"retained_image_digests": [old, current], "retained_bootstrap_image_digests": [old]})
+        self.assertEqual(revision_module.revision_inputs(state), {"retained_image_digests": [old, current], "retained_bootstrap_image_digests": [old], "retained_web_containers": containers})
         state["resources"][1]["instances"].append({"index_key": "latest/bootstrap"})
         with self.assertRaises(ValueError):
             revision_module.revision_inputs(state)
+
+    def test_refuses_unrelated_image_or_secret_injection_in_retained_definition(self):
+        digest = "sha256:" + "a" * 64
+        for container in ({"name": "web", "image": "portyard:latest"}, {"name": "web", "image": f"218549829565.dkr.ecr.eu-west-2.amazonaws.com/godiffy-dev-application@{digest}", "secrets": [{"name": "key", "valueFrom": "unexpected"}]}):
+            state = {"resources": [{"module": revision_module.MODULE, "type": "aws_ecs_task_definition", "name": "web", "instances": [{"index_key": digest, "attributes": {"container_definitions": json.dumps([container])}}]}]}
+            with self.assertRaises(ValueError):
+                revision_module.revision_inputs(state)
 
 
 class RecoveryHealthTests(unittest.TestCase):

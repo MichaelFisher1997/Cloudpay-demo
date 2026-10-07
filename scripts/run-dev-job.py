@@ -17,9 +17,18 @@ def validate_target(data, identity):
         raise RuntimeError("Private jobs must use the DEV GitHub Actions identity")
 
 
+def job_overrides(job, reset_dev_data):
+    if not reset_dev_data:
+        return {}
+    if job != "migrate":
+        raise RuntimeError("Approved data reset is migration-only")
+    return {"containerOverrides": [{"name": "migrate", "environment": [{"name": "GODIFFY_DEV_RESET_CONFIRMATION", "value": "reset-godiffy-dev-data-for-clerk"}]}]}
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("job", choices=["bootstrap", "migrate", "verify"])
+    parser.add_argument("--reset-dev-data", action="store_true", help="Explicitly approved DEV Clerk data reset, migration job only")
     parser.add_argument("--outputs", type=Path, default=Path("terraform/environments/dev/deployment.json"))
     args = parser.parse_args()
     data = json.loads(args.outputs.read_text())["deployment"]["value"]
@@ -29,7 +38,8 @@ if __name__ == "__main__":
     if not definition.startswith(f"arn:aws:ecs:eu-west-2:218549829565:task-definition/godiffy-dev-{args.job}:"):
         raise RuntimeError("Unexpected task definition")
     network = {"awsvpcConfiguration": {"subnets": data["task_subnet_ids"], "securityGroups": [data["task_security_group"]], "assignPublicIp": "DISABLED"}}
-    run = aws("ecs", "run-task", "--cluster", data["cluster_name"], "--task-definition", definition, "--launch-type", "FARGATE", "--platform-version", "1.4.0", "--network-configuration", json.dumps(network), "--tags", "key=Project,value=godiffy", "key=Environment,value=dev", "key=ManagedBy,value=terraform", "key=Purpose,value=cloudpay-technical-assessment")
+    overrides = job_overrides(args.job, args.reset_dev_data)
+    run = aws("ecs", "run-task", "--cluster", data["cluster_name"], "--task-definition", definition, "--launch-type", "FARGATE", "--platform-version", "1.4.0", "--network-configuration", json.dumps(network), "--overrides", json.dumps(overrides), "--tags", "key=Project,value=godiffy", "key=Environment,value=dev", "key=ManagedBy,value=terraform", "key=Purpose,value=cloudpay-technical-assessment")
     if run.get("failures") or len(run.get("tasks", [])) != 1:
         raise RuntimeError("Private task failed to launch")
     arn = run["tasks"][0]["taskArn"]

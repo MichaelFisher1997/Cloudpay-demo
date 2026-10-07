@@ -15,6 +15,12 @@ locals {
     { name = "DATABASE_PORT", value = "5432" },
     { name = "DATABASE_NAME", value = "godiffy" },
   ]
+  clerk_environment = var.release.clerk_auth == null ? [] : [
+    { name = "CLERK_PUBLISHABLE_KEY", value = var.release.clerk_auth.publishable_key },
+    { name = "CLERK_ISSUER", value = var.release.clerk_auth.issuer },
+    { name = "CLERK_JWT_KEY", value = var.release.clerk_auth.jwt_key },
+    { name = "CLERK_ALLOWED_EMAILS", value = join(",", var.release.clerk_auth.allowed_emails) },
+  ]
   job_types = var.release.image_digest == null ? {} : merge(
     { migrate = { role_arn = aws_iam_role.migration.arn } },
     !var.production ? { verify = { role_arn = aws_iam_role.runtime.arn } } : {},
@@ -189,14 +195,16 @@ resource "aws_ecs_task_definition" "web" {
     cpu_architecture        = "X86_64"
     operating_system_family = "LINUX"
   }
-  container_definitions = jsonencode([{
+  # Retained revisions keep their exact prior configuration. Updating auth must
+  # create only the new image's revision, not replace historical definitions.
+  container_definitions = lookup(var.release.retained_web_containers, each.key, jsonencode([{
     name                   = "web"
     image                  = each.value
     essential              = true
     readonlyRootFilesystem = true
     user                   = "10001:10001"
     portMappings           = [{ containerPort = 3000, protocol = "tcp" }]
-    environment = concat(local.common_environment, [
+    environment = concat(local.common_environment, local.clerk_environment, [
       { name = "IMAGE_BUCKET", value = var.image_bucket_name },
       { name = "DATABASE_SECRET_ARN", value = var.database.runtime_secret_arn },
       { name = "APP_URL", value = local.origin },
@@ -214,7 +222,7 @@ resource "aws_ecs_task_definition" "web" {
     }
     linuxParameters = { initProcessEnabled = true }
     stopTimeout     = 30
-  }])
+  }]))
   tags       = var.tags
   depends_on = [data.aws_ecr_image.release]
 }

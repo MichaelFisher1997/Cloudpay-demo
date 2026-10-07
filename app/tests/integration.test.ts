@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { randomBytes } from "node:crypto";
 import { Pool } from "pg";
-import { createAuth } from "../src/server/auth";
+import { tokenFixture } from "./token-fixture";
 import {
   imageService,
   ConflictError,
@@ -76,15 +76,6 @@ local("PostgreSQL 17 integration (isolated local test container)", () => {
       connections.push(db);
       return db;
     };
-    const request = (path: string, body: unknown) =>
-      new Request(`https://gallery.example/api/auth/${path}`, {
-        method: "POST",
-        headers: {
-          origin: "https://gallery.example",
-          "content-type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
     let releaseClaim: (() => void) | undefined;
     let releaseDeleteClaim: (() => void) | undefined;
     try {
@@ -119,6 +110,65 @@ local("PostgreSQL 17 integration (isolated local test container)", () => {
         secrets.get(ids.migration)!.password!,
       );
       await migrate(migration);
+      // Model the previous deployed schema and data, without retaining the old
+      // authentication library. Reset is atomic, limited to the explicit tables.
+      await migration.query('CREATE TABLE "user" (id text PRIMARY KEY)');
+      for (const table of ["session", "account", "verification", "rateLimit"])
+        await migration.query(`CREATE TABLE "${table}" (id text PRIMARY KEY)`);
+      await migration.query("INSERT INTO \"user\" VALUES ('legacy-user')");
+      await migration.query(
+        "INSERT INTO \"session\" VALUES ('legacy-session')",
+      );
+      await migration.query(
+        'ALTER TABLE images ADD CONSTRAINT images_owner_id_fkey FOREIGN KEY(owner_id) REFERENCES "user"(id)',
+      );
+      await migration.query(`INSERT INTO images(id,owner_id,name,status,pending_key,checksum,content_type,bytes)
+        VALUES('11111111-1111-4111-8111-111111111111','legacy-user','old.png','pending','pending/legacy','checksum','image/png',1)`);
+      await expect(migrate(migration)).rejects.toThrow(
+        "approved DEV data reset",
+      );
+      expect(
+        (await migration.query("SELECT count(*)::int AS count FROM images"))
+          .rows[0].count,
+      ).toBe(1);
+      await migration.query("CREATE TABLE unknown_operator_table(id int)");
+      await expect(migrate(migration, { resetDevData: true })).rejects.toThrow(
+        "Unexpected DEV schema",
+      );
+      expect(
+        (await migration.query("SELECT count(*)::int AS count FROM images"))
+          .rows[0].count,
+      ).toBe(1);
+      await migration.query("DROP TABLE unknown_operator_table"); // Only our isolated local fixture.
+      await migration.query(
+        "ALTER TABLE images RENAME CONSTRAINT images_owner_id_fkey TO operator_relationship",
+      );
+      await expect(migrate(migration, { resetDevData: true })).rejects.toThrow(
+        "Unexpected legacy ownership constraint",
+      );
+      expect(
+        (await migration.query("SELECT count(*)::int AS count FROM images"))
+          .rows[0].count,
+      ).toBe(1); // TRUNCATE rolled back with the unexpected relationship.
+      await migration.query(
+        "ALTER TABLE images RENAME CONSTRAINT operator_relationship TO images_owner_id_fkey",
+      );
+      await migrate(migration, { resetDevData: true });
+      for (const table of [
+        "images",
+        "user",
+        "session",
+        "account",
+        "verification",
+        "rateLimit",
+      ])
+        expect(
+          (
+            await migration.query(
+              `SELECT count(*)::int AS count FROM "${table}"`,
+            )
+          ).rows[0].count,
+        ).toBe(0);
       await migrate(migration);
       await Promise.all([migrate(migration), migrate(migration)]);
       const runtime = connectAs(
@@ -150,58 +200,8 @@ local("PostgreSQL 17 integration (isolated local test container)", () => {
           .rows[0].id,
       ).toBe(1);
 
-      const settings = {
-        origin: "https://gallery.example",
-        secure: true,
-        invites: new Set<string>(),
-      };
-      const auth = createAuth(
-        runtime,
-        secrets.get(ids.runtime)!.auth_secret!,
-        settings,
-      );
-      const invited = `invited-${randomBytes(8).toString("hex")}@example.test`;
-      const blocked = `blocked-${randomBytes(8).toString("hex")}@example.test`;
-      const password = randomBytes(24).toString("base64url");
-      settings.invites.add(invited);
-      const rejected = await auth.handler(
-        request("sign-up/email", { name: "No", email: blocked, password }),
-      );
-      expect(rejected.status).toBeGreaterThanOrEqual(400);
-      expect(
-        (await runtime.query('SELECT id FROM "user" WHERE email=$1', [blocked]))
-          .rows,
-      ).toHaveLength(0);
-      const signup = await auth.handler(
-        request("sign-up/email", { name: "Invited", email: invited, password }),
-      );
-      expect(signup.status).toBe(200);
-      const login = await auth.handler(
-        request("sign-in/email", { email: invited, password }),
-      );
-      expect(login.status).toBe(200);
-      const cookie = login.headers.get("set-cookie")?.split(";")[0];
-      expect(cookie).toBeTruthy();
-      const session = await auth.api.getSession({
-        headers: new Headers({ cookie: cookie! }),
-      });
-      expect(session?.user.email).toBe(invited);
-      const attempts = await Promise.all(
-        Array.from({ length: 8 }, () =>
-          auth.handler(
-            request("sign-in/email", { email: invited, password: "incorrect" }),
-          ),
-        ),
-      );
-      expect(attempts.some((response) => response.status === 429)).toBe(true);
-      expect(
-        Number(
-          (await runtime.query('SELECT count(*) FROM "rateLimit"')).rows[0]
-            .count,
-        ),
-      ).toBeGreaterThan(0);
-      const userId = session!.user.id;
-      const stranger = randomBytes(8).toString("hex");
+      const userId = "user_localOwner";
+      const stranger = "user_localOther";
 
       const png = Uint8Array.from(
         Buffer.from(
@@ -351,11 +351,7 @@ local("PostgreSQL 17 integration (isolated local test container)", () => {
         version: "destination-v2",
       });
       if (process.env.BUILT_SMOKE === "1") {
-        await smokeBuiltRuntime(
-          address,
-          secrets.get(ids.runtime)!.password!,
-          secrets.get(ids.runtime)!.auth_secret!,
-        );
+        await smokeBuiltRuntime(address, secrets.get(ids.runtime)!.password!);
       }
     } finally {
       releaseClaim?.();
@@ -365,11 +361,7 @@ local("PostgreSQL 17 integration (isolated local test container)", () => {
   }, 120_000);
 });
 
-async function smokeBuiltRuntime(
-  address: URL,
-  password: string,
-  authSecret: string,
-) {
+async function smokeBuiltRuntime(address: URL, password: string) {
   const reserved = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,
@@ -378,8 +370,7 @@ async function smokeBuiltRuntime(
   const port = reserved.port;
   reserved.stop(true);
   const origin = `http://127.0.0.1:${port}`;
-  const invited = `smoke-${randomBytes(8).toString("hex")}@example.test`;
-  const credentials = randomBytes(24).toString("base64url");
+  const fixture = tokenFixture(origin);
   const app = Bun.spawn(["bun", ".output/server/index.mjs"], {
     cwd: import.meta.dir + "/..",
     env: {
@@ -393,8 +384,10 @@ async function smokeBuiltRuntime(
       DATABASE_HOST: "127.0.0.1",
       DATABASE_SECRET_ARN: "unused-local-smoke",
       DATABASE_URL: `postgres://godiffy_runtime:${encodeURIComponent(password)}@127.0.0.1:${address.port}/godiffy`,
-      LOCAL_AUTH_SECRET: authSecret,
-      INVITED_EMAILS: invited,
+      CLERK_PUBLISHABLE_KEY: fixture.settings.publishableKey,
+      CLERK_ISSUER: fixture.settings.issuer,
+      CLERK_JWT_KEY: fixture.settings.jwtKey,
+      CLERK_ALLOWED_EMAILS: [...fixture.settings.allowedEmails].join(","),
       NITRO_HOST: "127.0.0.1",
       NITRO_PORT: String(port),
     },
@@ -433,52 +426,43 @@ async function smokeBuiltRuntime(
       (
         await post(
           "/api/auth/sign-up/email",
-          { email: invited, name: "Smoke", password: credentials },
+          {},
           { ...headers, origin: "http://attacker.invalid" },
         )
       ).status,
     ).toBe(403);
     expect(
-      (
-        await post("/api/auth/sign-up/email", {
-          email: "not-invited@example.test",
-          name: "No",
-          password: credentials,
-        })
-      ).status,
+      (await post("/api/auth/sign-up/email", {})).status,
     ).toBeGreaterThanOrEqual(400);
+    expect((await post("/api/auth/sign-up/email", {})).status).toBe(410);
+    expect((await post("/api/auth/sign-in/email", {})).status).toBe(410);
+    const publicConfig = await fetch(origin + "/api/auth/config");
+    expect(publicConfig.status).toBe(200);
+    expect(await publicConfig.json()).toEqual({
+      publishableKey: fixture.settings.publishableKey,
+    });
+    expect((await fetch(origin + "/api/images/")).status).toBe(401);
     expect(
       (
-        await post("/api/auth/sign-up/email", {
-          email: invited,
-          name: "Smoke",
-          password: credentials,
+        await fetch(origin + "/api/images/", {
+          headers: {
+            authorization: `Bearer ${fixture.token({ email: "outsider@example.test" })}`,
+          },
         })
       ).status,
-    ).toBe(200);
-    const login = await post("/api/auth/sign-in/email", {
-      email: invited,
-      password: credentials,
-    });
-    expect(login.status).toBe(200);
-    const cookie = login.headers.get("set-cookie")?.split(";")[0];
-    expect(cookie).toBeTruthy();
-    const session = await fetch(origin + "/api/auth/get-session", {
-      headers: { cookie: cookie! },
-    });
-    expect(session.status).toBe(200);
-    expect((await session.json()).user.email).toBe(invited);
+    ).toBe(401);
+    const authorization = `Bearer ${fixture.token()}`;
     const gallery = await fetch(origin + "/api/images/", {
-      headers: { cookie: cookie! },
+      headers: { authorization },
     });
     expect(gallery.status).toBe(200);
-    expect((await gallery.json()).images).toEqual([]);
+    expect(Array.isArray((await gallery.json()).images)).toBe(true);
     expect(
       (
         await post(
           "/api/images/",
           {},
-          { ...headers, cookie: cookie!, origin: "http://attacker.invalid" },
+          { ...headers, authorization, origin: "http://attacker.invalid" },
         )
       ).status,
     ).toBe(403);

@@ -52,6 +52,10 @@ async function main() {
     )
       throw new Error("permissions");
     await db.query("SELECT id FROM godiffy.images LIMIT 0");
+    const relationship = await db.query(
+      "SELECT 1 FROM pg_constraint WHERE conrelid='godiffy.images'::regclass AND contype='f'",
+    );
+    if (relationship.rowCount) throw new Error("permissions");
     console.log("Database TLS, runtime permissions and gallery SELECT: PASS");
   } finally {
     await db.end();

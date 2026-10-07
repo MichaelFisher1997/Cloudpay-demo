@@ -24,6 +24,13 @@ the workflow succeeded. Review action/runner pins as part of maintenance.
 
 ## Authorized DEV Actions delivery
 
+Current auth delivery is described in [clerk-dev.md](clerk-dev.md): new service
+releases use Clerk, preserve exact historical web definitions, migrate/verify the
+gallery DB and check public auth boundaries. The separately approved data reset
+is service-apply-only and off by default. Older password/S3 smoke evidence below
+is historical; real Google and post-cutover browser S3 verification are manual.
+The obsolete password-session recovery option is blocked before AWS access.
+
 The existing GitHub OIDC **provider** is deliberately reused. The existing
 `cloudpay-demo-github-actions` role trusts the immutable repository identity and
 `master`. The user authorized narrowly scoped DEV permissions on this role and

@@ -1,6 +1,8 @@
 # Godiffy — application
 
-Single-container TanStack Start + Bun, PostgreSQL sessions, private versioned S3 images.
+Single-container TanStack Start + Bun, Clerk Google sign-in, PostgreSQL gallery
+records and private versioned S3 images. See the [Clerk DEV guide](../docs/clerk-dev.md)
+for the cutover, exact-email restrictions and one-off approved data reset.
 DEV deployment is authorized and running through GitHub Actions; the exact tested
 URL, digest and verification limits are recorded in [deployment status](../docs/dev-deployment.md).
 Production registration and deployment remain blocked pending separate approval.
@@ -14,14 +16,20 @@ bun run test
 bun run typecheck
 bun run build
 bun run start
-# Dedicated one-off IAM roles, ordered:
-bun run db:bootstrap
-bun run db:migrate
+# Local isolated PostgreSQL + actual built server (no AWS):
+bun run test:built
 # From app/:
 docker build --platform linux/amd64 -t godiffy:local .
 ```
 
-`GET /health/live` and `/health/ready` are process-only 200 probes, deliberately independent of PostgreSQL. Container binds `0.0.0.0:3000`; Docker CMD runs config preflight then `exec`s Bun so Bun receives SIGTERM. Runtime user is `10001:10001`; the image runs with a read-only filesystem. The multiarch `oven/bun:1.4.2-alpine` base is pinned to OCI index `sha256:d888c0ae6c86d7866ff10c5aafdd9077b36aee6455b33dd270fb93c0dd5cef6f`; deployment must select linux/amd64. The earlier Debian base had six critical and 19 high OS-package findings; the Alpine replacement retains the same Bun version, and publication/deployment now require a complete ECR scan with no critical/high findings. This OS scan does not cover every statically linked library or prove absence of vulnerabilities. For local PG17 integration tests, run `bun scripts/test-database.ts` from the repository root, which creates a unique temporary `postgres:17-alpine` Docker container, ephemeral password, and host-only random port; it runs `PG_TEST_URL=postgres://... bun test tests/integration.test.ts` inside `app/` without printing credentials. From `app/`, `bun run test:built` first builds then uses that same isolated local runner to exercise the **actual `.output` server** over HTTP: signup, login, session, gallery DB query, blocked outsider and CSRF. The test intentionally sets `NODE_ENV=development`, `ENVIRONMENT=dev`, and loopback `DATABASE_URL`; it does **not** test production AWS/RDS TLS. The integration test has no AWS calls (in-memory Secrets Manager port and S3 port); without `PG_TEST_URL` it skips. Stop only your own named test container.
+Health endpoints are process-only 200 probes, independent of PostgreSQL. The
+container binds port 3000, runs config preflight then `exec`s Bun, and remains
+non-root (`10001:10001`), read-only and linux/amd64. The Bun 1.4.2 Alpine base is
+digest-pinned; Actions requires a completed ECR scan with no critical/high findings.
+Local tests own a uniquely named loopback-only PostgreSQL 17 container and use
+ephemeral credentials/RSA keys without AWS access. `bun run test:built` exercises
+the actual output's bearer auth, rejected old password endpoints, gallery SQL,
+allowlist and CSRF boundaries. It does not test Google OAuth, AWS RDS TLS or real S3.
 
 ## Environment / operator contract
 
@@ -30,15 +38,38 @@ The Docker base additionally pins Alpine's published security fixes
 An unpatched Alpine candidate was also rejected (2 critical/8 high findings).
 Runtime still performs no package installs and keeps the non-root/read-only contract.
 
-Runtime: **required** `ENVIRONMENT=dev|prod`, `AWS_REGION`, `IMAGE_BUCKET`, `DATABASE_HOST`, `DATABASE_SECRET_ARN`, `APP_URL` (exact public origin). Defaults: `DATABASE_PORT=5432`, `DATABASE_NAME=godiffy`, `INVITED_EMAILS=` (empty disables registration). `APP_URL` must be HTTPS in `prod`, and `ALLOW_INSECURE_HTTP=true` is rejected outright in `prod` even if the URL is HTTPS. HTTP is allowed **only** with both `ENVIRONMENT=dev` and `ALLOW_INSECURE_HTTP=true`; this dev ALB-origin bootstrap is a draft decision. `NODE_ENV=production` remains the build/runtime framework setting; it does not override `ENVIRONMENT`. `DATABASE_URL` is local-only (localhost and `ENVIRONMENT=dev`, rejected with `NODE_ENV=production`); local auth additionally requires ephemeral `LOCAL_AUTH_SECRET` >=32 characters. Runtime secret JSON `{username,password,auth_secret}` is fetched by standard AWS task credentials on first DB use; pool max 5. An idle pool failure emits only a generic log line, never a pg error object. The public RDS global CA bundle is fetched at **image build**, baked into the image, and used for TLS certificate and hostname verification. Rebuild for CA refresh. Credentials are cached per process; after manual rotation restart tasks/job pools. **No automatic rotation is claimed.**
+Runtime requires `ENVIRONMENT=dev|prod`, `AWS_REGION`, `IMAGE_BUCKET`, `DATABASE_HOST`,
+`DATABASE_SECRET_ARN`, `APP_URL`, `CLERK_PUBLISHABLE_KEY`, `CLERK_ISSUER`,
+`CLERK_JWT_KEY` (public PEM), and nonempty `CLERK_ALLOWED_EMAILS` (exact emails).
+Defaults: DB port 5432/name `godiffy`. Production rejects HTTP and the insecure
+flag, including with an HTTPS URL; DEV HTTP requires explicit opt-in. Local DB
+overrides must be loopback and are rejected in production. The runtime secret uses
+only `{username,password}`; the legacy `auth_secret` field is preserved but unused.
+The five-connection pool validates the baked RDS CA/hostname. Credentials are
+cached per process; restart tasks after manual rotation. No automatic rotation is
+claimed. Clerk's 60-second bearer tokens are verified offline, without a secret
+key or internet route. Tests use local ephemeral signing keys, never an auth bypass.
 
-One-off `db:bootstrap`: `AWS_REGION`, `DATABASE_HOST`, optional DB port/name, `MASTER_SECRET_ARN`, `DATABASE_SECRET_ARN`, `MIGRATION_SECRET_ARN`. It reads RDS-managed master JSON username/password, creates fixed NO-CREATEDB/NO-CREATEROLE roles `godiffy_schema` and `godiffy_runtime`, owns the `godiffy` schema, grants only runtime DML and search path, and writes generated role credentials plus auth signing secret directly to two pre-created Secrets Manager containers. PostgreSQL 16+ CREATEROLE-created membership defaults to `SET FALSE`; bootstrap grants `SET TRUE` on **only** `godiffy_schema` to the current master so schema ownership transfer works, never to runtime. Advisory lock serializes concurrent bootstrap jobs. Re-running reuses secret values without rotating. Dedicated bootstrap role must read master and read/write only app/migration secret containers. PostgreSQL default PUBLIC CONNECT on other databases remains untouched; isolate RDS instance/database if this matters.
+Bootstrap creates the restricted `godiffy_schema` / `godiffy_runtime` SQL roles
+and writes credentials directly into existing Secrets Manager containers. DEV's
+master-access bootstrap identity is **retired**; do not reactivate it. Existing
+credentials and the legacy unused auth field are preserved. Routine migration
+uses only the schema identity; runtime cannot read migration/master secrets.
 
-One-off `db:migrate`: `AWS_REGION`, `DATABASE_HOST`, optional DB port/name, `MIGRATION_SECRET_ARN`. Only schema-owner login and read-only access to migration secret. Advisory lock serializes Better Auth programmatic migrations plus `images` table/index and runtime existing/default grants. Jobs report only generic error type, not SQL, passwords, signed URLs, or SDK error details. Run bootstrap, then migration, then app. No Terraform PostgreSQL provider. Migration schema assumes default PG text user ID, Better Auth PostgreSQL core schema plus `rateLimit`, and fixed schema `godiffy` owned by `godiffy_schema`.
+One-off `db:migrate` uses the schema identity/secret, an advisory transaction lock
+and fixed `godiffy.images` schema/index/grants. Ownership is a Clerk `user_*` ID,
+not a foreign key into old auth tables. Existing legacy data cannot be migrated
+without the explicit guarded reset. No Terraform PostgreSQL provider or master
+secret is involved. Normal migrations do not delete data.
 
 ## Security and S3 permissions
 
-**Production blocker:** `INVITED_EMAILS` is only an email-string allowlist, **not proof of inbox ownership**. Anyone who knows an invited address can register it first; no verified-email delivery or operator-issued one-time invitation token exists. Do not enable production registration until an architect approves a verified invitation mechanism. Empty list disables registration. Password login and sessions use Better Auth/PostgreSQL; its database-backed limiter allows at most 5 sign-in or sign-up requests per 60s key (other Better Auth defaults apply). ALB **append** mode puts the observed client IP in the last `X-Forwarded-For` position; auth routes replace the entire chain with that one syntactically valid IP (or remove a malformed value). **Task security group must allow only ALB ingress**, otherwise direct callers could spoof even that final hop. ALB client-port appending must remain disabled; malformed/no IP falls back to Better Auth's shared bucket. Never trust a caller-supplied leftmost XFF hop.
+Google sign-in and verified-email claims replace the old unverified password
+registration. Clerk enforces the named-email allowlist on sign-up **and sign-in**;
+the API independently enforces it on every gallery request. Cookies, client email
+headers and old password endpoints cannot authenticate. Production is still
+undeployed and requires separately reviewed production Clerk keys, OAuth
+credentials, HTTPS and operational controls. DEV keys are rejected in production.
 
 Mutations require exact `Origin: APP_URL`; auth and image endpoints reject cross-origin Fetch Metadata. Every gallery read/write filters by authenticated owner. Browser upload accepts JPEG/PNG/WebP <=10 MiB, calculates SHA-256, and gets a 5-minute S3 POST policy with fixed type/checksum and content-length range. Finalization HEAD checks size/type/checksum/version, inspects at most 64 KiB of header to verify reported format/dimensions (<=40 megapixels), then copies the **pinned source version** to `images/` and saves the **destination version**. This header check is **not full-image decoding, malware scanning, metadata stripping, or content sanitization**; corrupt trailing image data and polyglots remain possible. 2-minute download URL pins the stored version. Claims prevent concurrent finalization; crashed claim can retry after two minutes; stale copy versions are cleaned on loser/deletion races. Deletes tombstone rows and retry deletion of the recorded version. DB retains pending rows; Terraform owns pending-prefix S3 lifecycle cleanup. S3 bucket MUST enable versioning and stay private; exact-origin POST CORS is needed. Never log signed URLs.
 
@@ -46,25 +77,23 @@ Mutations require exact `Origin: APP_URL`; auth and image endpoints reject cross
 
 ## Verification and known limits
 
-- Frozen install, formatting, strict types and production build pass. Current
-  credential-free CI runs **15 unit tests** (one integration skip without DB),
-  built-server/local PostgreSQL integration with **49 assertions**, dependency
-  audit (**0 advisories / 216 packages**) and non-root/read-only amd64 image smoke.
+- Local frozen install, format, strict types and build pass: **20 unit tests**,
+  one integration skip without DB, **54** built-server/PostgreSQL assertions,
+  **35** Python guard tests and **28** Terraform mock runs. Dependency audit:
+  **0 advisories / 211 packages**. Actions additionally builds/scans the image.
 - Local PG17 uses a non-superuser database-owner/CREATEROLE master. It covers
-  repeated/concurrent migration, runtime grants, auth/session/limiter persistence,
+  repeated/concurrent migration, runtime grants, guarded reset/rollback,
   fake-storage ownership, checksum rejection, claims and delete/finalize races.
   Presigned-policy tests check key, MIME, checksum, byte range and expiration.
   Those mocks are not real S3 or AWS RDS-master proof.
 - Actual Actions private jobs subsequently exercised RDS-managed initialization,
   Secrets Manager writes, validated RDS TLS, plaintext rejection and runtime
-  SQL/master/migration-secret restrictions. Final AWS HTTP/S3 auth, ownership,
-  upload/download/privacy/limits/delete smoke passed. Task-recovery testing was
-  not run; the deployment handoff separates these results from local tests.
+  SQL/master/migration-secret restrictions. Historical password-release HTTP/S3
+  smoke passed; this does not prove the new Google browser flow. See the current
+  Clerk handoff for deployment and manual verification status.
 - All direct dependencies remain pinned and the lockfile frozen. Nitro is still a
-  beta; Vite/Rolldown emits TanStack `use client` module-directive warnings. Better
-  Auth's schema validator warns that its own generated `rateLimit.lastRequest`
-  bigint differs from expected `number`, despite tested PostgreSQL functionality.
-  Neither warning is a production certification; monitor upstream before promotion.
-- No production HTTPS/invitation, full-image decoding/malware scanning, interactive
-  browser, load/restore or regional failover proof is claimed. Process probes and
+  beta; Vite/Rolldown emits TanStack `use client` module-directive warnings.
+  Better Auth was removed. These checks are not production certification.
+- No production HTTPS/invitation, full-image decoding/malware scanning, authenticated
+  Google/S3 browser, load/restore or regional failover proof is claimed. Process probes and
   OS/dependency scans have intentionally bounded scope.

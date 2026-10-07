@@ -8,7 +8,7 @@ MODULE = "module.godiffy.module.application"
 
 
 def revision_inputs(state):
-    images, bootstrap = set(), set()
+    images, bootstrap, containers = set(), set(), {}
     for resource in state.get("resources", []):
         if resource.get("module") != MODULE or resource.get("mode", "managed") != "managed" or resource["type"] != "aws_ecs_task_definition":
             continue
@@ -22,9 +22,17 @@ def revision_inputs(state):
                 raise ValueError("Unexpected immutable definition history")
             digest = match.group(1)
             images.add(digest)
+            if resource["name"] == "web":
+                value = instance["attributes"]["container_definitions"]
+                definition = json.loads(value)
+                if len(definition) != 1 or definition[0].get("name") != "web" or definition[0].get("image") != f"218549829565.dkr.ecr.eu-west-2.amazonaws.com/godiffy-dev-application@{digest}":
+                    raise ValueError("Unexpected retained DEV web container")
+                if definition[0].get("secrets"):
+                    raise ValueError("Unexpected retained secret injection")
+                containers[digest] = value
             if resource["name"] == "job" and match.group(2) == "bootstrap":
                 bootstrap.add(digest)
-    return {"retained_image_digests": sorted(images), "retained_bootstrap_image_digests": sorted(bootstrap)}
+    return {"retained_image_digests": sorted(images), "retained_bootstrap_image_digests": sorted(bootstrap), "retained_web_containers": containers}
 
 
 if __name__ == "__main__":
@@ -35,4 +43,4 @@ if __name__ == "__main__":
         history = revision_inputs(state)
         inputs["release"].update(history)
         path.write_text(json.dumps(inputs))
-        print(f"Retained {len(history['retained_image_digests'])} image digests and {len(history['retained_bootstrap_image_digests'])} actual initialization digests; no raw state/values persisted.")
+        print(f"Retained {len(history['retained_image_digests'])} image digests, exact web configurations and {len(history['retained_bootstrap_image_digests'])} actual initialization digests; no raw state or secret values persisted.")

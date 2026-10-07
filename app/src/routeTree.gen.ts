@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as HealthLiveRouteImport } from './routes/health.live'
 import { Route as HealthReadyRouteImport } from './routes/health.ready'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiAuthConfigRouteImport } from './routes/api/auth/config'
 import { Route as ApiImagesIndexRouteImport } from './routes/api/images/index'
 import { Route as ApiImagesIdRouteImport } from './routes/api/images/$id'
 import { Route as ApiImagesIdCompleteRouteImport } from './routes/api/images/$id.complete'
@@ -36,6 +37,11 @@ const HealthReadyRoute = HealthReadyRouteImport.update({
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthConfigRoute = ApiAuthConfigRouteImport.update({
+  id: '/api/auth/config',
+  path: '/api/auth/config',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiImagesIndexRoute = ApiImagesIndexRouteImport.update({
@@ -64,6 +70,7 @@ export interface FileRoutesByFullPath {
   '/health/live': typeof HealthLiveRoute
   '/health/ready': typeof HealthReadyRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/auth/config': typeof ApiAuthConfigRoute
   '/api/images/$id': typeof ApiImagesIdRouteWithChildren
   '/api/images/': typeof ApiImagesIndexRoute
   '/api/images/$id/complete': typeof ApiImagesIdCompleteRoute
@@ -74,6 +81,7 @@ export interface FileRoutesByTo {
   '/health/live': typeof HealthLiveRoute
   '/health/ready': typeof HealthReadyRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/auth/config': typeof ApiAuthConfigRoute
   '/api/images/$id': typeof ApiImagesIdRouteWithChildren
   '/api/images': typeof ApiImagesIndexRoute
   '/api/images/$id/complete': typeof ApiImagesIdCompleteRoute
@@ -85,6 +93,7 @@ export interface FileRoutesById {
   '/health/live': typeof HealthLiveRoute
   '/health/ready': typeof HealthReadyRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/auth/config': typeof ApiAuthConfigRoute
   '/api/images/$id': typeof ApiImagesIdRouteWithChildren
   '/api/images/': typeof ApiImagesIndexRoute
   '/api/images/$id/complete': typeof ApiImagesIdCompleteRoute
@@ -97,6 +106,7 @@ export interface FileRouteTypes {
     | '/health/live'
     | '/health/ready'
     | '/api/auth/$'
+    | '/api/auth/config'
     | '/api/images/$id'
     | '/api/images/'
     | '/api/images/$id/complete'
@@ -107,6 +117,7 @@ export interface FileRouteTypes {
     | '/health/live'
     | '/health/ready'
     | '/api/auth/$'
+    | '/api/auth/config'
     | '/api/images/$id'
     | '/api/images'
     | '/api/images/$id/complete'
@@ -117,6 +128,7 @@ export interface FileRouteTypes {
     | '/health/live'
     | '/health/ready'
     | '/api/auth/$'
+    | '/api/auth/config'
     | '/api/images/$id'
     | '/api/images/'
     | '/api/images/$id/complete'
@@ -128,6 +140,7 @@ export interface RootRouteChildren {
   HealthLiveRoute: typeof HealthLiveRoute
   HealthReadyRoute: typeof HealthReadyRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiAuthConfigRoute: typeof ApiAuthConfigRoute
   ApiImagesIdRoute: typeof ApiImagesIdRouteWithChildren
   ApiImagesIndexRoute: typeof ApiImagesIndexRoute
 }
@@ -160,6 +173,13 @@ declare module '@tanstack/react-router' {
       path: '/api/auth/$'
       fullPath: '/api/auth/$'
       preLoaderRoute: typeof ApiAuthSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/config': {
+      id: '/api/auth/config'
+      path: '/api/auth/config'
+      fullPath: '/api/auth/config'
+      preLoaderRoute: typeof ApiAuthConfigRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/images/': {
@@ -212,6 +232,7 @@ const rootRouteChildren: RootRouteChildren = {
   HealthLiveRoute: HealthLiveRoute,
   HealthReadyRoute: HealthReadyRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiAuthConfigRoute: ApiAuthConfigRoute,
   ApiImagesIdRoute: ApiImagesIdRouteWithChildren,
   ApiImagesIndexRoute: ApiImagesIndexRoute,
 }

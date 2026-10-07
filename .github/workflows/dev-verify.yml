@@ -5,7 +5,7 @@ on:
       replace_task:
         type: boolean
         default: false
-        description: Stop only the single DEV web task and verify recovery with saved sessions
+        description: Legacy recovery option; unavailable after Clerk cutover (use manual Google session testing)
 permissions:
   contents: read
 defaults:
@@ -39,6 +39,11 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: 1.4.2
+      - name: Reject obsolete password-session recovery before AWS access
+        if: inputs.replace_task
+        run: |
+          echo 'Clerk Google session recovery requires a separate interactive test; no task will be stopped.' >&2
+          exit 1
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           aws-region: eu-west-2
@@ -63,9 +68,9 @@ jobs:
         run: |
           python3 scripts/verify-dev.py | tee /tmp/godiffy-inventory.json
           cat /tmp/godiffy-inventory.json >> "$GITHUB_STEP_SUMMARY"
-      - name: HTTP and direct S3 smoke; optional authorized task recovery
+      - name: Clerk configuration and anonymous API boundary smoke
         working-directory: app
         run: |
           bun install --frozen-lockfile
-          bun run smoke:aws
-          cat /tmp/godiffyAWSsmoke.json >> "$GITHUB_STEP_SUMMARY"
+          bun run smoke:clerk
+          cat /tmp/godiffyClerkSmoke.json >> "$GITHUB_STEP_SUMMARY"
