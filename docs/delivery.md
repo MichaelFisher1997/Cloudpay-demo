@@ -72,15 +72,18 @@ RDS-managed master-secret creation/tagging is initially restricted to RDS forwar
   DEV workflows explicitly select Bash (`-eo pipefail`), so a failed auditor/scan
   cannot be masked by `tee`. Scan startup's not-yet-created metadata is retried
   within a bounded wait, never accepted as a clean result.
-- Private bootstrap/migration/DB-verification jobs run via Actions with no public
-  task IP. Service activation re-verifies the DB before apply, then exercises real
-  HTTP auth/ownership and direct S3 POST/CORS/checksum/size/download/deletion.
+- Private migration/DB-verification jobs run via Actions with no public task IP;
+  the bootstrap identity stays retired. Service releases verify the DB before
+  apply and after migration, then check deployed Clerk configuration and anonymous
+  API denial. Real Google login and post-cutover S3 browser checks require the
+  owner; prior password-auth/S3 smoke results are historical, not Clerk proof.
 - All deployment workflows share one non-cancelling DEV concurrency group. Only
   master can assume the role. No environment trust, production authority or PR
   credentials are introduced. Raw plans/state are never uploaded as artifacts.
-- HTTP test passwords are generated inside the runner and saved only in a
-  dedicated disposable fixture secret. CI cannot read application, migration or
-  RDS master secrets; controlled bootstrap indirect authority is removed afterward.
+- The historical password smoke generated disposable fixtures only in its runner
+  and dedicated fixture secret; Clerk smoke does not use them or manufacture a
+  user/session. The old secret is preserved, not cleaned up. CI cannot read
+  application, migration or RDS master secrets; bootstrap authority stays removed.
 - Human retirement additionally sets the bootstrap boundary to explicit secret
   denials and removes CI bootstrap `PassRole`. CI cannot restore master access by
   editing the retained role's trust or inline policy. This is independent of the
@@ -152,11 +155,14 @@ treat its profile name as permission to manage other applications.
    access, short retention and a recorded hash; never public raw state/plan JSON.
 4. Explicitly approve and apply that exact saved plan under one environment-level
    concurrency group; S3 lockfile additionally protects Terraform writers.
-5. Run/check approved one-off migrations **before** service activation, then
-   Terraform-owned task/service update. Circuit breaker can roll back unhealthy
-   deployment, but database changes need an independently reviewed rollback strategy.
-6. Verify users/ownership/direct S3 flow, logs/alarms and task AZ distribution.
-   Promote the same tested artifact to prod only after its separate approval.
+5. For the approved DEV Clerk cutover, wait for the Terraform-owned web rollout
+   to reach steady state and drain legacy auth, then run the atomic data reset and
+   ownership migration; rerun the runtime DB verifier. Ordinary DEV releases run
+   idempotent migration with reset off. Future incompatible migrations need their
+   own ordering/rollback review; legacy password releases cannot roll back the reset.
+6. Check deployed auth boundaries and record the owner's Google/gallery/S3 browser
+   proof separately. Broader observability, recovery and production promotion are
+   not authorized by this interview-demo release.
 
 Do not let an independent `aws ecs update-service` pipeline and Terraform both
 own task definitions. Do not use `ignore_changes` on the task definition to hide

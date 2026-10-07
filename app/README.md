@@ -89,11 +89,12 @@ Mutations require exact `Origin: APP_URL`; auth and image endpoints reject cross
 - Actual Actions private jobs subsequently exercised RDS-managed initialization,
   Secrets Manager writes, validated RDS TLS, plaintext rejection and runtime
   SQL/master/migration-secret restrictions. Historical password-release HTTP/S3
-  smoke passed; this does not prove the new Google browser flow. See the current
-  Clerk handoff for deployment and manual verification status.
+  smoke passed; this does not prove Clerk. The owner separately reported successful
+  real Google/gallery/image testing and unapproved-account rejection after the
+  Clerk cutover; this is manual, not agent-automated. See the current Clerk handoff.
 - All direct dependencies remain pinned and the lockfile frozen. Nitro is still a
   beta; Vite/Rolldown emits TanStack `use client` module-directive warnings.
   Better Auth was removed. These checks are not production certification.
-- No production HTTPS/invitation, full-image decoding/malware scanning, authenticated
-  Google/S3 browser, load/restore or regional failover proof is claimed. Process probes and
+- No production HTTPS/invitation, full-image decoding/malware scanning, automated
+  authenticated Google/S3 browser, load/restore or regional failover proof is claimed. Process probes and
   OS/dependency scans have intentionally bounded scope.

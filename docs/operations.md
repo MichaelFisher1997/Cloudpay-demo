@@ -8,6 +8,9 @@ DEV plan and stop if it includes deletions, unrelated/Portyard/production resour
 or unexpected scope. Production, ACM and DNS work below remain future runbook
 instructions, not authorized actions.
 Never operate on Portyard resources; use exact Godiffy identifiers from outputs.
+The initial foundations/bootstrap sequence below is historical setup, not authority
+to rerun it against the live service. Bootstrap stays retired. Current authentication,
+the one-off approved reset and manual Google proof are in [clerk-dev.md](clerk-dev.md).
 
 ## 1. Review foundations
 
@@ -104,21 +107,22 @@ for this cleanup. Service validation rejects leaving master-access bootstrap ena
 
 ## 4. Activate dev service and verify core behavior
 
-Dispatch `phase=service` with the same real digest. Actions generates the retired
-bootstrap/ready-database/service inputs and approved **disposable DEV test**
-email allowlist. Addresses are not secrets but are visible in Terraform/task
-configuration. Empty defaults disable registration. Review and approve the saved
-service plan and supply its fingerprint for apply. A private DB verification runs
-again before service apply and with the released image after apply; HTTP/S3 smoke follows activation. Until separately
-authorized final TLS integration, only the ALB hostname over HTTP works.
+Dispatch `phase=service` with the scan-clean immutable digest. Actions supplies
+retired-bootstrap/ready-database inputs and public Clerk DEV configuration, including
+the named-email API allowlist. Review the saved plan and supply its fingerprint.
+The private runtime verifier runs before apply. After the service reaches steady
+state and drains legacy auth, Actions migrates ownership and reruns DB verification
+and Clerk boundary smoke. Only the separately approved first cutover sets
+`reset_dev_data=true`; ordinary releases must leave it false. Until separately
+authorized TLS integration, use only the existing HTTP ALB hostname.
 
 Check:
 
 - Tasks have no public IP and pull ECR layers through approved endpoints.
 - ALB sees healthy tasks; `/health/live` and `/health/ready` are process-only probes,
   not a claim that RDS/S3 are available. DB outages must not trigger health-probe loops.
-- Invited signup/login, persistent session through replacement, and rejection of
-  non-invited signup/cross-origin mutations.
+- Approved Google sign-in, named-email rejection and cross-origin mutation denial.
+  Real Google/gallery/S3 browser proof is manual; anonymous smoke cannot prove it.
 - JPEG/PNG/WebP upload, oversized/type/checksum rejection, version-pinned completion,
   download and retry-safe deletion. Browser S3 POST/CORS must be tested for real.
 - A second user's session cannot list/read/finalize/download/delete another's image.
@@ -127,7 +131,8 @@ Check:
 - Load tests validate 512 MiB memory, CPU targets, DB pool/max connections and
   RDS burst-credit usage before any sizing claims or production promotion.
 
-Do not use real/reused passwords or sensitive photos during HTTP bootstrap. The
+Use non-sensitive photos only; gallery bearer tokens cross HTTP even though Google
+credentials stay on HTTPS pages. The
 actual AWS evidence and remaining gaps are in [dev-deployment.md](dev-deployment.md).
 Protocol-level POST/CORS checks do not substitute for an interactive browser or
 production load/restore testing.
@@ -165,20 +170,22 @@ RDS/app logs have bounded retention; production ALB logs have a dedicated privat
 90-day bucket. There is no paid external tracing or monitoring dependency.
 
 - **Failed release:** circuit breaker rolls back an unhealthy service deployment;
-  inspect events and dedicated logs. For deliberate rollback, plan the prior known
-  ECR digest and obtain approval. Preserve tagged rollback images. No independent
-  CLI task-definition owner should fight Terraform.
+   inspect events and dedicated logs. For deliberate rollback, plan the prior known
+   compatible Clerk ECR digest and obtain approval. **Legacy password releases are
+   incompatible after the reset**, even if their image scan was clean. Preserve
+   historical images; no independent CLI owner should fight Terraform.
 - **DB failure/storage:** inspect only this DB's metrics/latest-restorable time,
   failover events, application 5xx and connection headroom. Scaling tasks is not a
   remedy for an exhausted database. DB-dependent requests can fail even if process
   probes stay healthy.
-- **Migration failure:** stop rollout; old code/schema must remain compatible.
-  Current migrations create schema/indexes/grants, but future destructive changes
-  need expand/contract design and explicit data-impact approval. Image rollback
-  cannot undo database changes.
+- **Migration failure:** stop and inspect the exact job; do not repeat the reset
+  blindly. Its six-table truncation and legacy-ownership change share one transaction.
+  Future destructive changes need separate approval; image rollback cannot restore
+  deleted demo records or make legacy password code compatible.
 - **Credential rotation:** coordinate DB password update, Secrets Manager update,
-  pool/task restarts and smoke tests. Changing auth signing secret can invalidate
-  sessions. Do not claim automatic runtime rotation; only RDS master is managed.
+  pool/task restarts and smoke tests. Clerk signing-key rotation requires releasing
+  its new public PEM; do not introduce a Clerk secret key. Do not claim automatic
+  runtime rotation; only RDS master is managed.
 - **Terraform lock:** identify the exact environment/key and writer before any
   force-unlock. Never remove someone else's active lock or overwrite remote state.
 

@@ -58,15 +58,18 @@ replacing the healthy database merely to align placements.
 
 ## Application and data flow
 
-Single-container TanStack Start/Bun with Better Auth and PostgreSQL-backed users,
-password accounts, sessions and rate limiting. Runtime state is in RDS/S3, not
-on task disk, so scaling and rolling replacements do not need sticky sessions.
+Single-container TanStack Start/Bun with Clerk development Google authentication.
+The browser obtains short-lived sessions; the server verifies bearer tokens offline
+with a pinned public key. Gallery state is in RDS/S3, not on task disk, so scaling
+and rolling replacements do not need sticky sessions or an internet route to Clerk.
 The intentionally minimal product is a per-user gallery, not a complex gallery
 sharing/social platform.
 
-1. Operator-approved dev test addresses may register; the empty default allowlist
-   disables registration. Production cannot enable this email-only mechanism.
-2. Every image operation authenticates a PostgreSQL session and checks owner ID.
+1. Clerk permits only named, approved Google-account emails on sign-up/sign-in.
+   The API independently requires a signed verified email on the same allowlist.
+   Production still requires separate Clerk/OAuth/HTTPS approval.
+2. Every image operation checks the signed issuer, exact origin, expiry, session
+   and stable Clerk user ID; gallery SQL always filters by that owner ID.
 3. Server creates pending metadata and a five-minute signed S3 POST with fixed
    key, JPEG/PNG/WebP MIME, SHA-256 and a 10 MiB maximum.
 4. Browser sends bytes directly to S3 over HTTPS; no AWS credentials are embedded.
@@ -85,9 +88,9 @@ and retained-version storage are explicit operating responsibilities.
 
 Image-header checks are not malware scanning, full decoding or metadata stripping.
 Production invitation verification and content threat requirements remain review
-gates; see [app limits](../app/README.md). Temporary dev HTTP uses disposable
-passwords and non-sensitive images only; browsers' password/session traffic is
-not encrypted until TLS integration. PostgreSQL and S3 traffic already use TLS.
+gates; see [app limits](../app/README.md). DEV uses non-sensitive images only:
+Google credentials stay on HTTPS pages, but gallery bearer tokens cross the HTTP
+ALB connection. PostgreSQL, S3 and browser-to-Clerk traffic already use TLS.
 
 ## Credentials and jobs
 

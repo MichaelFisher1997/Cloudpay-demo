@@ -6,16 +6,18 @@ GitHub Actions delivery—not application complexity or production certification
 
 ## Current status
 
-**Clerk DEV cutover is prepared:** Google sign-in with an exact verified-email
-allowlist replaces local passwords. The separately approved data reset runs only
-in the reviewed Actions release; [setup/access instructions](docs/clerk-dev.md).
+**Clerk DEV is deployed:** Google-only sign-in and an exact verified-email
+allowlist replace local passwords. The approved demo-data reset completed;
+S3 objects/versions were preserved. [Access and verification status](docs/clerk-dev.md).
 
 - **Deployed and verified:** dedicated Godiffy S3 Terraform backend, native state
   locking, versioning, encryption, and six bootstrap resources. Local backups retained.
 - **DEV is running:** [HTTP ALB URL](http://godiffy-dev-alb-1345285825.eu-west-2.elb.amazonaws.com).
-  Database jobs and real login/S3 upload/download/ownership/delete checks passed.
-  [Release run 37691404457](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37691404457)
-  applied **8 additions, 1 in-place update, 0 deletions** and finished with **no changes**.
+  [Clerk release 37700319765](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37700319765)
+  applied **3 additions, 1 in-place update, 0 deletions**; reset/migration, DB
+  verification and anonymous auth-boundary smoke passed; final plan **no changes**.
+  Google-only live UI/OAuth handoff passed. The owner also reported successful
+  Google login and image upload/download/delete, plus unapproved-account rejection.
 - **Production remains undeployed:** its historical 76-addition foundation plan
   is design evidence, not authorization or a current apply input.
 - No Portyard application infrastructure, production application resources or DNS
@@ -26,7 +28,7 @@ in the reviewed Actions release; [setup/access instructions](docs/clerk-dev.md).
   deployment uses manual plan/apply/image Actions workflows only.
   See [dev deployment status](docs/dev-deployment.md).
 - Plans/state/dependencies and all credentials are excluded from Git.
-- **GitHub validation passed:** [run 37690611200](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37690611200)
+- **GitHub validation passed:** [run 37699566022](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37699566022)
   tests/builds the actual committed implementation without AWS credentials.
 
 DEV is intentionally HTTP-only: use non-sensitive images. Google credentials
@@ -36,7 +38,7 @@ health probes, local mocks or a scan as proof of production readiness.
 
 ## Five-minute interview demo
 
-1. After the Clerk release, open the site and use **Google sign-in** with an
+1. Open the site and use **Google sign-in** with an
    allowlisted email; upload/download/delete a non-sensitive image. Add interviewers
    individually using [the DEV access guide](docs/clerk-dev.md).
 2. Walk through `terraform/environments/dev` and the focused modules in
@@ -46,14 +48,15 @@ health probes, local mocks or a scan as proof of production readiness.
 4. Explain S3 remote state/native locking, private tasks/RDS, separate task roles,
    OIDC without permanent keys, and the deliberate one-task/Single-AZ cost trade-off.
 5. State the estimated **$100–170/month** envelope and separately approved
-   [teardown](docs/teardown.md). Production, browser/load/restore and task-recovery
-   testing are not claimed.
+    [teardown](docs/teardown.md). Production, load/restore and task-recovery testing
+    are not claimed; authenticated browser proof is the owner's manual report.
 
 ## Design in brief
 
 ```mermaid
 flowchart LR
-  Browser -->|HTTPS final / disposable HTTP dev bootstrap| ALB[Public ALB: two AZs]
+  Browser <-->|Google sign-in over HTTPS| Clerk[Clerk DEV]
+  Browser -->|HTTP DEV / HTTPS production design| ALB[Public ALB: two AZs]
   ALB -->|Private port 3000| ECS[Private ECS Fargate]
   ECS -->|Verified PostgreSQL TLS| RDS[Private RDS PostgreSQL]
   ECS -->|Task IAM / HTTPS| SM[Secrets Manager]

@@ -1,10 +1,52 @@
-# DEV deployment handoff — 7 October 2026
+# DEV deployment handoff — 8 October 2026
 
-**Auth cutover pending:** [Clerk DEV notes](clerk-dev.md) track the newly configured
-Google sandbox and approved database reset. The release evidence below describes
-the prior password-auth deployment until the Clerk Actions cutover completes.
+## Current outcome: Clerk deployed; approved DEV reset completed; Terraform converged
 
-## Outcome: interview demo deployed; real HTTP/S3 smoke passed; Terraform converged
+**URL:** http://godiffy-dev-alb-1345285825.eu-west-2.elb.amazonaws.com
+
+Google is the only sign-in/sign-up method. Both Clerk and the API restrict access
+to the verified email `contact@michaelfisher.tech`. The API verifies short-lived
+tokens offline; no Clerk secret, NAT, new RDS or other always-on service was added.
+
+- Running image: `218549829565.dkr.ecr.eu-west-2.amazonaws.com/godiffy-dev-application@sha256:0b9490fbfef66443dbca66960709e4a7c2510890b50396423fcaf369915843d1`.
+- Immutable source/tag: `5c2c5d86123526be4bbf1418c9015b50437c5ae4`.
+- New migration/verification definitions: `godiffy-dev-migrate:3` / `godiffy-dev-verify:3`.
+- Completed ECR scan: **no reported findings**; frozen dependency audit: **0 / 211 packages**.
+
+| Evidence | Actual result |
+| --- | --- |
+| [Clerk validation 37699566022](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37699566022) | 28 Terraform mock runs, 35 Python guard tests, 20 app unit tests, 54 PostgreSQL/built-server assertions and container guards passed without AWS credentials |
+| [Clerk image 37699588978](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37699588978) | Scan-clean immutable digest published through Actions |
+| [Clerk plan 37699841686](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37699841686) | **3 add / 1 in-place change / 0 delete / 0 import**; only three definitions and the service, no IAM/network/RDS changes |
+| [Clerk cutover 37700319765](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37700319765) | Reviewed fingerprint matched; **3 added / 1 changed / 0 destroyed**; steady-state rollout, approved reset/migration and runtime verification succeeded; Clerk boundary smoke passed; final refreshed plan **no changes** |
+
+Cutover fingerprint:
+`8a56b69079c9fe4cddcf110e8cf8384a924a4c24a41c3d1a2d56edc2a9a26998`.
+The run completed **7 October 2026, 23:11 UTC**. Its old/new verifier tasks and the
+reset/migration task each exited **0**. The reset checked empty demo tables before
+commit and removed legacy gallery ownership; it made **no S3 object/version calls**.
+RDS, roles, secrets, state, backups and historical task definitions were preserved.
+See [the exact reset log stream and access procedure](clerk-dev.md).
+
+The live UI, process probes and public auth configuration returned HTTP 200;
+retired password endpoints returned 410; anonymous, old-cookie and spoofed-header
+gallery requests were denied. A fresh anonymous Chrome browser verified Google-only
+sign-in/sign-up on the actual HTTP ALB, no identity/password inputs, zero page errors
+and a Google OAuth handoff. The owner separately reported that **real Google login,
+gallery loading and image upload/open/download/delete passed, and an unapproved
+Google account was blocked**. This is owner-reported live manual evidence; the agent
+did not inspect real token contents or automate authenticated OAuth/S3. Prior
+password/S3 evidence below is kept distinct from this report.
+
+Use non-sensitive images only: Google credentials stay on HTTPS pages, but gallery
+session tokens cross HTTP. The small DEV topology and estimated **$100–170/month**
+envelope are unchanged. Production, Portyard, DNS/certificates and IAM were untouched.
+No teardown, S3 cleanup, broad verification or recovery exercise was run.
+
+## Historical password-release outcome — before the Clerk cutover
+
+The following evidence and inventory describe the **prior** password-auth release,
+not current authentication or a compatible rollback target.
 
 **URL:** http://godiffy-dev-alb-1345285825.eu-west-2.elb.amazonaws.com
 
@@ -16,7 +58,7 @@ Use only disposable passwords and non-sensitive images: DEV is intentionally HTT
 
 Account **218549829565**, region **eu-west-2**, environment **dev**.
 
-- Running image: `218549829565.dkr.ecr.eu-west-2.amazonaws.com/godiffy-dev-application@sha256:52f132c7cb0264b64da5a6e6075757984c456a17f73e9b13b52bedb6b2852587`.
+- Prior image: `218549829565.dkr.ecr.eu-west-2.amazonaws.com/godiffy-dev-application@sha256:52f132c7cb0264b64da5a6e6075757984c456a17f73e9b13b52bedb6b2852587`.
 - Immutable tag: `a627234812426dec69faa1f970f5bb43cb821456`.
 - Web definition: `arn:aws:ecs:eu-west-2:218549829565:task-definition/godiffy-dev-web:2`.
 - Completed ECR OS scan: **no reported findings**. Dependency audit: zero advisories.
@@ -27,12 +69,14 @@ The preserved `portyard` / `PortyardAdministrator` SSO identity is used only for
 read-only inspection and exact DEV IAM bootstrap. No Portyard infrastructure,
 production, DNS, ACM, Cloudflare/Route 53, IAM users or permanent keys were changed.
 
-## Actual final inventory
+## Historical inventory — before the Clerk cutover
 
-DEV state contains **102 managed records: 88 new DEV records and 14 exact imported
-CI policies/attachments**; no taints remain. The independent backend has six records.
-Final state inspected at serial **16**, after the successful release. Raw state and plans
-remain private/owner-only, not committed or published as ordinary artifacts.
+DEV state contained **102 managed records: 88 new DEV records and 14 exact imported
+CI policies/attachments**; no taints remained then. The independent backend has six records.
+Prior state was inspected at serial **16**. The Clerk release added three definition
+records and changed only the service; no new raw-state inventory/serial is claimed.
+Raw state and plans remain private/owner-only, not committed or published as
+ordinary artifacts.
 
 | Component | Actual inventory/status |
 | --- | --- |
@@ -141,14 +185,16 @@ Focused repairs preserved resources rather than replacing them:
   broader production-readiness project. The optional `dev-verify.yml` full inventory,
   live CI-secret-denial/log-sampling/metric audit and task-replacement exercise were
   **not run**. Recovery helpers are implemented/tested locally, not proven in AWS.
-- Interactive-browser testing is unavailable (desktop browser disconnected).
+- The desktop browser remains disconnected. Anonymous headless Chrome checks passed
+  for the Clerk UI/Google handoff; authenticated Google/S3 proof is owner-reported,
+  not agent-automated.
   Protocol-level CORS preflight is not a claim of every browser behavior.
 - No production HTTPS/DNS/invitation-ownership, load/autoscaling stress, backup
   restore, AZ/regional failover or malware/full-image-decoding proof is claimed.
   RDS backup metadata is not a successful restore. Scans do not cover every static
   library or prove absence of vulnerabilities.
-- Process-only health probes can remain healthy during DB failure. Better Auth
-  warns about its generated `rateLimit.lastRequest` bigint; Nitro is beta and
+- Process-only health probes can remain healthy during DB failure. The historical
+  Better Auth bigint warning no longer applies to Clerk; Nitro remains beta and
   Vite/Rolldown emits module-directive warnings. Tested behavior does not erase
   those upgrade/production-review risks.
 - No alert email recipient or AWS Budget was added without approval. SNS routing
@@ -180,12 +226,13 @@ To refresh the same deployed configuration without a local application apply:
 ```sh
 gh workflow run dev-deploy.yml --repo MichaelFisher1997/Cloudpay-demo --ref master \
   -f phase=service -f operation=plan \
-  -f image_digest=sha256:52f132c7cb0264b64da5a6e6075757984c456a17f73e9b13b52bedb6b2852587
+  -f image_digest=sha256:0b9490fbfef66443dbca66960709e4a7c2510890b50396423fcaf369915843d1
 ```
 
-Actions reconstructs both retained release digests from state, and retains only
+Actions reconstructs all retained release digests/configurations from state, retaining only
 the original bootstrap digest. The live release has `bootstrap_enabled=false`,
-`bootstrap_retained=true`, `service_enabled=true`, `database_ready=true`, with
-`smoke-owner@godiffy.invalid`, `smoke-other@godiffy.invalid`, `interview@godiffy.invalid`
-as the disposable DEV allowlist. Do not apply the default foundations-only inputs
-against a live service or reuse an old saved plan.
+`bootstrap_retained=true`, `service_enabled=true`, `database_ready=true`. The actual
+Clerk/API allowlist is `contact@michaelfisher.tech`; old disposable invited-email
+configuration is unused by Clerk. **Leave `reset_dev_data=false` for subsequent
+releases.** Do not apply foundations-only inputs against the live service, reuse an
+old plan, restore bootstrap privileges or select a legacy password digest.
