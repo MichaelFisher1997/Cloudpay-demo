@@ -26,6 +26,10 @@ on:
         type: boolean
         default: false
         description: Explicit healthy, uninitialized failed-new DEV DB read repair; never deletes data
+      repair_failed_service:
+        type: boolean
+        default: false
+        description: Explicitly approved healthy failed-new service status-read repair; retains running service
 
 permissions:
   contents: read
@@ -97,6 +101,9 @@ jobs:
       - name: Explicitly retain healthy uninitialized failed-new DEV DB
         if: inputs.repair_failed_database && inputs.phase == 'foundations'
         run: python3 scripts/repair-dev-db-state.py
+      - name: Explicitly retain the verified healthy failed-new DEV service
+        if: inputs.repair_failed_service && inputs.phase == 'service'
+        run: python3 scripts/repair-dev-service-state.py --image-digest "$IMAGE_DIGEST"
       - name: Saved DEV plan
         run: |
           umask 077

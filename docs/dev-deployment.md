@@ -1,6 +1,6 @@
 # DEV deployment status — 7 October 2026
 
-## Outcome: DEV foundations converged; image published; private jobs next
+## Outcome: private jobs passed; service running; guarded status-read retry next
 
 The user approved autonomous **DEV-only** deployment in account `218549829565`,
 region `eu-west-2`, using the existing `portyard` SSO profile and
@@ -58,7 +58,21 @@ CI imports**. [Image publication 37628283144](https://github.com/MichaelFisher19
 built/smoke-tested amd64 and pushed immutable tag `1c0b0f698fb4b1e31d5ee99916a3b894f7f24f07`,
 digest `sha256:44c6c7efdd7feb4b688bea19c1c158f6efcea49accb213b31c5426e0bd44dfa3`.
 The jobs [plan 37631037555](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37631037555)
-passed scope review: **6 additions, 0 changes, 0 deletions**. It has not run jobs yet.
+passed scope review: **6 additions, 0 changes, 0 deletions**.
+[Jobs apply 37633228998](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37633228998)
+created those six records, ran bootstrap/migration/runtime verification privately
+with **exit 0** for each and confirmed a zero-change plan. Verification exercised
+validated TLS, rejected plaintext and restricted SQL/master/migration-secret access.
+Human retirement set the bootstrap boundary to explicit secret denials and removed
+CI bootstrap `PassRole`; Actions also denied the retained role's trust/inline policy.
+
+[Service apply 37636634654](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37636634654)
+created the service but its provider health waiter lacked `ecs:ListServiceDeployments`.
+AWS reports **one running task, completed rollout, no failed tasks**, while Terraform
+marked the service tainted. The user separately approved a guarded Actions-only
+retention repair after verifying exact tags, recent creation, image, private network
+and healthy ALB target. Only failed-read state taint is cleared; deletion/replacement
+remains forbidden. The narrowly scoped deployment metadata reads are being added.
 
 The implementation and status/runbooks were committed and pushed to `master` in
 `7809dabb87812ae9da125003a5d7d8df826c9bc9`. GitHub
@@ -115,9 +129,10 @@ scope-reviewed before apply, not assumed current because they exist locally.
 - [x] Re-plan DEV; reject all deletions/unrelated resources; apply reviewed foundations and confirm convergence.
 - [ ] Verify network, private endpoints/SGs, versioned private images, RDS and ECR.
 - [x] Commit/build a linux/amd64 image; publish immutable SHA tag and record digest.
-- [ ] Plan/apply narrowly scoped private bootstrap/migration definitions and roles.
-- [ ] Run/check job exit codes; test RDS TLS and runtime SQL privileges.
-- [ ] Restrict bootstrap access in place, without deleting Terraform resources.
+- [x] Plan/apply narrowly scoped private bootstrap/migration definitions and roles.
+- [x] Run/check job exit codes; test RDS TLS and runtime SQL privileges.
+- [x] Restrict bootstrap access in place, without deleting Terraform resources.
+- [ ] Retain verified healthy service after its failed status read using approved Actions repair.
 - [ ] Plan/apply one-replica HTTP DEV service, monitoring and scaling.
 - [ ] Test signup/login/session, DB, S3 POST/CORS/limits/download/delete and ownership.
 - [ ] Test bucket privacy, IAM denial, metrics/logs and basic task replacement.

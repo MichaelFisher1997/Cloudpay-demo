@@ -20,6 +20,7 @@ repair_module = load("repair-dev-log-state.py")
 verify_module = load("verify-dev.py")
 db_repair_module = load("repair-dev-db-state.py")
 job_module = load("run-dev-job.py")
+service_repair_module = load("repair-dev-service-state.py")
 
 
 class DevDeliveryTests(unittest.TestCase):
@@ -126,6 +127,9 @@ class DevDeliveryTests(unittest.TestCase):
         self.assertEqual(listed["Condition"]["ArnEquals"]["ecs:cluster"], "arn:aws:ecs:eu-west-2:218549829565:cluster/godiffy-dev-cluster")
         self.assertEqual(statements["RegionalTaskDefinitionMetadata"]["Action"], "ecs:DescribeTaskDefinition")
         self.assertEqual(statements["RegionalTaskDefinitionMetadata"]["Resource"], "*")
+        deployment = statements["OnlyDevDeploymentStatus"]
+        self.assertEqual(deployment["Action"], ["ecs:ListServiceDeployments", "ecs:DescribeServiceDeployments"])
+        self.assertTrue(all("/godiffy-dev-cluster/godiffy-dev-web" in arn for arn in deployment["Resource"]))
 
 
 class EmptyLogRepairTests(unittest.TestCase):
@@ -204,3 +208,38 @@ class ActionsJobTests(unittest.TestCase):
                 job_module.validate_target(target, {**identity, "Arn": arn})
         with self.assertRaises(RuntimeError):
             job_module.validate_target({**target, "environment": "prod"}, identity)
+
+
+class HealthyServiceRepairTests(unittest.TestCase):
+    def run_repair(self, *, tainted=True, recent=True, owned=True, image=True, private=True, healthy=True, actions=True, exact=True):
+        m = service_repair_module
+        digest = "sha256:" + "a" * 64
+        definition = f"arn:aws:ecs:{m.REGION}:{m.ACCOUNT}:task-definition/{m.SERVICE}:1"
+        network = {"task_subnet_ids": ["subnet-fixture"], "task_security_group": "sg-fixture"}
+        state = {"resources": [
+            {"module": "module.godiffy.module.application", "type": "aws_ecs_service", "name": "this", "instances": [{"index_key": 0, "status": "tainted" if tainted else "ready", "attributes": {"id": m.SERVICE_ARN if exact else "arn:aws:ecs:eu-west-2:218549829565:service/portyard/web"}}]},
+            {"module": "module.godiffy.module.application", "type": "aws_ecs_task_definition", "name": "web", "instances": [{"index_key": digest, "attributes": {"arn": definition}}]},
+        ], "outputs": {"deployment": {"value": {"account_id": m.ACCOUNT, "region": m.REGION, "environment": "dev", "image_digest": digest, **network}}}}
+        service = {"createdAt": datetime.now(timezone.utc).isoformat() if recent else "2000-01-01T00:00:00+00:00", "serviceArn": m.SERVICE_ARN, "clusterArn": m.CLUSTER_ARN, "status": "ACTIVE", "tags": [{"key": key, "value": value} for key, value in m.TAGS.items()] if owned else [], "desiredCount": 1, "runningCount": 1, "pendingCount": 0, "taskDefinition": definition, "launchType": "FARGATE", "enableExecuteCommand": False, "deployments": [{"status": "PRIMARY", "rolloutState": "COMPLETED"}], "networkConfiguration": {"awsvpcConfiguration": {"assignPublicIp": "DISABLED" if private else "ENABLED", "subnets": network["task_subnet_ids"], "securityGroups": [network["task_security_group"]]}}, "loadBalancers": [{"containerName": "web", "containerPort": 3000, "targetGroupArn": f"arn:aws:elasticloadbalancing:{m.REGION}:{m.ACCOUNT}:targetgroup/godiffy-dev-app/fixture"}]}
+        task = {"group": f"service:{m.SERVICE}", "taskDefinitionArn": definition, "lastStatus": "RUNNING", "healthStatus": "HEALTHY", "containers": [{"name": "web", "imageDigest": digest if image else "sha256:" + "b" * 64}], "attachments": [{"details": [{"name": "networkInterfaceId", "value": "eni-fixture"}]}]}
+        responses = [
+            {"Account": m.ACCOUNT, "Arn": f"arn:aws:sts::{m.ACCOUNT}:assumed-role/" + ("cloudpay-demo-github-actions/test" if actions else "AWSReservedSSO_PortyardAdministrator_fixture/michael")},
+            {"services": [service]}, {"taskArns": [f"arn:aws:ecs:{m.REGION}:{m.ACCOUNT}:task/{m.CLUSTER}/fixture"]}, {"tasks": [task]},
+            {"NetworkInterfaces": [{"SubnetId": network["task_subnet_ids"][0], "Groups": [{"GroupId": network["task_security_group"]}], "PrivateIpAddress": "10.42.10.10"}]},
+            {"TargetHealthDescriptions": [{"Target": {"Id": "10.42.10.10"}, "TargetHealth": {"State": "healthy" if healthy else "unhealthy"}}]},
+        ]
+        with patch.object(m, "read", return_value=state), patch.object(m, "aws", side_effect=responses), patch.object(m.subprocess, "run") as mutate:
+            if all((tainted, recent, owned, image, private, healthy, actions, exact)):
+                m.main(digest)
+                mutate.assert_called_once_with(["terraform", "-chdir=terraform/environments/dev", "untaint", m.ADDRESS], check=True, timeout=120)
+            else:
+                with self.assertRaises(RuntimeError):
+                    m.main(digest)
+                mutate.assert_not_called()
+
+    def test_only_verified_exact_healthy_failed_read_service_is_retained(self):
+        self.run_repair()
+
+    def test_refuses_ordinary_old_unowned_public_wrong_image_or_unhealthy_service(self):
+        for key in ("tainted", "recent", "owned", "image", "private", "healthy", "actions", "exact"):
+            self.run_repair(**{key: False})

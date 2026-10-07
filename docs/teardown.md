@@ -44,7 +44,7 @@ published in logs or ordinary Actions artifacts.
   Keep `skip_final_snapshot=false`, `delete_automated_backups=false` and record the
   final snapshot name `godiffy-dev-final-<that-suffix>`.
 - In an explicit retirement-only code change, remove `prevent_destroy` from the
-  DEV DB instance, image bucket and smoke secret; disable DEV DB deletion protection
+  DEV DB instance, image bucket, runtime/migration secret containers and smoke secret; disable DEV DB deletion protection
   with a reviewed non-destructive Actions apply **before** the destroy plan.
   Do not weaken production protections. Do not change final-snapshot requirements.
 - Inventory **all versions and delete markers** in

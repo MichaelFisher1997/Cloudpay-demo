@@ -106,6 +106,7 @@ def generate(master_arn=None, bootstrap_pass=True, scaling_arn=None):
         # ECS does not offer resource-level authorization for this read API.
         statement("RegionalTaskDefinitionMetadata", "ecs:DescribeTaskDefinition", "*", regional),
         statement("OnlyDevService", ["ecs:CreateService", "ecs:UpdateService", "ecs:DescribeServices", "ecs:ListTagsForResource", "ecs:TagResource"], service),
+        statement("OnlyDevDeploymentStatus", ["ecs:ListServiceDeployments", "ecs:DescribeServiceDeployments"], [service, f"arn:aws:ecs:{REGION}:{ACCOUNT}:service-deployment/{PREFIX}-cluster/{PREFIX}-web/*"]),
         statement("PrivateDevJobs", "ecs:RunTask", task_definitions, {"ArnEquals": {"ecs:cluster": cluster}}),
         statement("OnlyDevTaskStatusAndRecovery", ["ecs:DescribeTasks", "ecs:StopTask"], task_resources),
         statement("TagDevJobTasks", "ecs:TagResource", task_resources, requested),

@@ -74,6 +74,18 @@
       "Resource": "arn:aws:ecs:eu-west-2:218549829565:service/godiffy-dev-cluster/godiffy-dev-web"
     },
     {
+      "Sid": "OnlyDevDeploymentStatus",
+      "Effect": "Allow",
+      "Action": [
+        "ecs:ListServiceDeployments",
+        "ecs:DescribeServiceDeployments"
+      ],
+      "Resource": [
+        "arn:aws:ecs:eu-west-2:218549829565:service/godiffy-dev-cluster/godiffy-dev-web",
+        "arn:aws:ecs:eu-west-2:218549829565:service-deployment/godiffy-dev-cluster/godiffy-dev-web/*"
+      ]
+    },
+    {
       "Sid": "PrivateDevJobs",
       "Effect": "Allow",
       "Action": "ecs:RunTask",
