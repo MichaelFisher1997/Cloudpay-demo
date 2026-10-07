@@ -21,6 +21,10 @@ module "godiffy" {
   https_redirect_enabled = var.https_redirect_enabled
   invited_emails         = var.invited_emails
   final_snapshot_suffix  = var.final_snapshot_suffix
+  task_permissions_boundaries = {
+    for kind in ["execution", "runtime", "migration", "bootstrap"] :
+    kind => "arn:aws:iam::218549829565:policy/godiffy-dev-boundary-${kind}"
+  }
 }
 
 output "deployment" {

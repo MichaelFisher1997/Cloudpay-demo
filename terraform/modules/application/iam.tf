@@ -15,9 +15,10 @@ locals {
 }
 
 resource "aws_iam_role" "execution" {
-  name               = "${var.name}-execution"
-  assume_role_policy = local.task_trust
-  tags               = var.tags
+  name                 = "${var.name}-execution"
+  assume_role_policy   = local.task_trust
+  tags                 = var.tags
+  permissions_boundary = lookup(var.task_permissions_boundaries, "execution", null)
 }
 
 resource "aws_iam_role_policy" "execution" {
@@ -50,9 +51,10 @@ resource "aws_iam_role_policy" "execution" {
 }
 
 resource "aws_iam_role" "runtime" {
-  name               = "${var.name}-runtime"
-  assume_role_policy = local.task_trust
-  tags               = var.tags
+  name                 = "${var.name}-runtime"
+  assume_role_policy   = local.task_trust
+  tags                 = var.tags
+  permissions_boundary = lookup(var.task_permissions_boundaries, "runtime", null)
 }
 
 resource "aws_iam_role_policy" "runtime" {
@@ -84,9 +86,10 @@ resource "aws_iam_role_policy" "runtime" {
 }
 
 resource "aws_iam_role" "migration" {
-  name               = "${var.name}-migration"
-  assume_role_policy = local.task_trust
-  tags               = var.tags
+  name                 = "${var.name}-migration"
+  assume_role_policy   = local.task_trust
+  tags                 = var.tags
+  permissions_boundary = lookup(var.task_permissions_boundaries, "migration", null)
 }
 
 resource "aws_iam_role_policy" "migration" {
@@ -103,17 +106,21 @@ resource "aws_iam_role_policy" "migration" {
 }
 
 resource "aws_iam_role" "bootstrap" {
-  count              = var.release.bootstrap_enabled ? 1 : 0
-  name               = "${var.name}-bootstrap"
-  assume_role_policy = local.task_trust
-  tags               = var.tags
+  count = var.release.bootstrap_enabled || var.release.bootstrap_retained ? 1 : 0
+  name  = "${var.name}-bootstrap"
+  assume_role_policy = var.release.bootstrap_enabled ? local.task_trust : jsonencode({
+    Version   = "2012-10-17"
+    Statement = [{ Effect = "Deny", Principal = { Service = "ecs-tasks.amazonaws.com" }, Action = "sts:AssumeRole" }]
+  })
+  tags                 = var.tags
+  permissions_boundary = lookup(var.task_permissions_boundaries, "bootstrap", null)
 }
 
 resource "aws_iam_role_policy" "bootstrap" {
-  count = var.release.bootstrap_enabled ? 1 : 0
+  count = var.release.bootstrap_enabled || var.release.bootstrap_retained ? 1 : 0
   name  = "${var.name}-initialize-secrets"
   role  = aws_iam_role.bootstrap[0].id
-  policy = jsonencode({
+  policy = var.release.bootstrap_enabled ? jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
@@ -129,5 +136,12 @@ resource "aws_iam_role_policy" "bootstrap" {
         Resource = [var.database.runtime_secret_arn, var.database.migration_secret_arn]
       },
     ]
+    }) : jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Deny"
+      Action   = ["secretsmanager:GetSecretValue", "secretsmanager:PutSecretValue"]
+      Resource = [var.database.master_secret_arn, var.database.runtime_secret_arn, var.database.migration_secret_arn]
+    }]
   })
 }

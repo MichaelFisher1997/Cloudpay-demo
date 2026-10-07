@@ -13,6 +13,7 @@ output "deployment" {
     database_identifier  = module.database.identifier
     runtime_secret_arn   = module.database.runtime_secret_arn
     migration_secret_arn = module.database.migration_secret_arn
+    master_secret_arn    = module.database.master_secret_arn
     cluster_name         = module.application.cluster_name
     service_name         = module.application.service_name
     job_task_definitions = module.application.job_task_definitions

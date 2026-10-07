@@ -1,4 +1,10 @@
 mock_provider "aws" {}
+# Import reads must be explicitly overridden; never contact IAM in offline tests.
+override_resource {
+  target = aws_iam_policy.ci_scopes
+  values = { arn = "arn:aws:iam::218549829565:policy/godiffy-dev-mock-only" }
+}
+override_resource { target = aws_iam_role_policy_attachment.dev_ci }
 run "dev_foundations_only" {
   command = plan
   assert {

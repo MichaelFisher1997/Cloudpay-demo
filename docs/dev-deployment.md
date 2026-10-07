@@ -1,20 +1,37 @@
 # DEV deployment status — 7 October 2026
 
-## Outcome: authorized, blocked before AWS resource creation
+## Outcome: authorized, GitHub Actions rollout in preparation
 
 The user approved autonomous **DEV-only** deployment in account `218549829565`,
 region `eu-west-2`, using the existing `portyard` SSO profile and
 `PortyardAdministrator` human role. Production, Cloudflare/Route 53, ACM, custom
 domains, permanent keys and broad CI permissions remain forbidden.
 
-The AWS identity preflight could not authenticate. The cached SSO access token
+The earlier AWS identity preflight could not authenticate. The cached SSO access token
 expired at **2026-10-07 00:34:12 UTC**; refresh returned HTTP 400
 `invalid_grant` at approximately **10:19 UTC**. A desktop browser is not connected,
 so this session cannot complete a normal interactive SSO login on the user's behalf.
-The profile, role and AWS account configuration were not changed.
+The profile, role and AWS account configuration were not changed. The user has
+since renewed the existing session; exact account/human SSO identity verification
+now succeeds.
 
-No Terraform apply, ECR push, AWS job, DEV IAM permission change or application
-resource mutation was performed in this attempt. No alternate credentials were
+**Deployment must run from GitHub Actions**, per the user's latest direction.
+Human SSO is used only for read-only checks and bootstrap of the exact DEV CI
+permissions/task boundaries. No local Terraform application apply, ECR push,
+database job or ECS rollout is permitted. The user separately approved creation
+of exactly the missing AWS-managed RDS and ECS autoscaling service-linked roles
+by Actions; existing ECS/ELB service-linked roles remain unchanged.
+
+The delivery workflows enforce master-only OIDC, DEV state/account/region,
+immutable digests, explicit plan-review fingerprints, no Terraform deletions or
+replacements, and no CI edits to its own permissions or task boundaries. Bootstrap
+retirement restricts its trust/policy in place while retaining the role and task
+definition. Real private DB verification and HTTP/S3 smoke scripts are prepared;
+they have not yet run against AWS.
+
+No Terraform application apply, ECR push, AWS job or application resource mutation
+has occurred yet in the resumed rollout. Nine exact DEV IAM policies and five
+attachments have now been human-bootstrapped; no trust/profile change or alternate credentials were
 introduced. GitHub repository access is independent of this AWS login.
 
 The implementation and status/runbooks were committed and pushed to `master` in
@@ -26,7 +43,7 @@ check, amd64 Docker build, and read-only/non-root/production guard smoke. This
 workflow has no AWS credentials or deployment authority. No deployment workflow
 was run and no DEV OIDC IAM permissions could be configured without AWS access.
 
-Restore the existing session on the user's machine, then resume this authorization:
+For future session renewal, preserve the existing profile:
 
 ```sh
 nix-shell --run 'aws sso login --profile portyard'
@@ -49,10 +66,10 @@ Do not send tokens/passwords in chat, replace the profile or create access keys.
 | S3 image tests | Only local mock/presigned-policy tests; real S3 POST/CORS/download/delete/private-access tests not performed |
 | Bootstrap/migration | Local PG17 and actual built-server HTTP tests pass; no AWS job run |
 | IAM task roles | Planned execution/runtime/migration roles; none created in DEV |
-| GitHub OIDC | Existing provider and authentication-only role unchanged; no DEV deployment permissions granted |
+| GitHub OIDC | Existing provider/trust unchanged; five exact DEV CI scopes and four immutable task boundaries human-bootstrapped |
 | GitHub validation | Run 37607324492 succeeded for commit 7809dab; no AWS deployment step |
 | Real AWS tests in this attempt | Authentication/connectivity preflight only; resource verification is blocked |
-| Failure | Expired SSO session and invalid refresh grant; requires interactive login, not an architecture or IAM workaround |
+| Earlier blocker | SSO expiry resolved by the user; intermittent AWS API read timeouts were handled by bounded, idempotent bootstrap retries |
 | Still unverified | Entire deployed DEV path, private ECR pull, RDS master privileges/TLS, real S3 semantics, ALB health, logs/metrics, alarms, task replacement and OIDC deployment |
 | DEV recurring cost | No new DEV resource cost incurred; proposed always-on small-dev envelope **$100–170/month**, subject to usage; prior state-only footprint normally under $1/month |
 | Compromises | Planned one task/endpoint AZ and Single-AZ DB, HTTP/disposable test accounts, email-string allowlist, pinned Nitro beta, no regional DR |
@@ -65,8 +82,10 @@ scope-reviewed before apply, not assumed current because they exist locally.
 
 ## Resume checklist
 
-- [ ] Renew SSO; verify exact account and role.
-- [ ] Amend bootstrap retirement to restriction without Terraform resource deletion.
+- [x] Renew SSO; verify exact account and role.
+- [x] Amend bootstrap retirement to restriction without Terraform resource deletion.
+- [x] Validate and bootstrap exact DEV-only OIDC permissions and task boundaries.
+- [ ] Commit/push Actions-only delivery workflows and offline/real-test safeguards.
 - [ ] Re-plan DEV; reject all deletions/unrelated resources; apply the reviewed saved plan.
 - [ ] Verify network, private endpoints/SGs, versioned private images, RDS and ECR.
 - [ ] Commit/build a linux/amd64 image; publish immutable SHA tag and record digest.

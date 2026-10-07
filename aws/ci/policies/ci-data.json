@@ -1,0 +1,166 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadOnlyDevStatePrefix",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::godiffy-terraform-state-218549829565-eu-west-2",
+      "Condition": {
+        "StringLike": {
+          "s3:prefix": [
+            "godiffy/dev/*"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "ReadWriteDevState",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject"
+      ],
+      "Resource": "arn:aws:s3:::godiffy-terraform-state-218549829565-eu-west-2/godiffy/dev/terraform.tfstate"
+    },
+    {
+      "Sid": "NativeDevLock",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": "arn:aws:s3:::godiffy-terraform-state-218549829565-eu-west-2/godiffy/dev/terraform.tfstate.tflock"
+    },
+    {
+      "Sid": "StateBucketLocationOnly",
+      "Effect": "Allow",
+      "Action": "s3:GetBucketLocation",
+      "Resource": "arn:aws:s3:::godiffy-terraform-state-218549829565-eu-west-2"
+    },
+    {
+      "Sid": "DedicatedImageBucketConfiguration",
+      "Effect": "Allow",
+      "Action": [
+        "s3:CreateBucket",
+        "s3:GetBucketLocation",
+        "s3:GetBucketTagging",
+        "s3:PutBucketTagging",
+        "s3:GetEncryptionConfiguration",
+        "s3:PutEncryptionConfiguration",
+        "s3:GetBucketVersioning",
+        "s3:PutBucketVersioning",
+        "s3:GetBucketAcl",
+        "s3:GetBucketOwnershipControls",
+        "s3:PutBucketOwnershipControls",
+        "s3:GetBucketPublicAccessBlock",
+        "s3:PutBucketPublicAccessBlock",
+        "s3:GetBucketPolicy",
+        "s3:PutBucketPolicy",
+        "s3:GetBucketCORS",
+        "s3:PutBucketCORS",
+        "s3:GetLifecycleConfiguration",
+        "s3:PutLifecycleConfiguration",
+        "s3:ListBucket",
+        "s3:GetBucketRequestPayment",
+        "s3:GetBucketLogging",
+        "s3:GetBucketWebsite",
+        "s3:GetAccelerateConfiguration",
+        "s3:GetBucketObjectLockConfiguration",
+        "s3:GetReplicationConfiguration"
+      ],
+      "Resource": "arn:aws:s3:::godiffy-dev-images-218549829565-eu-west-2"
+    },
+    {
+      "Sid": "OnlyDevDatabase",
+      "Effect": "Allow",
+      "Action": [
+        "rds:CreateDBInstance",
+        "rds:ModifyDBInstance",
+        "rds:DescribeDBInstances",
+        "rds:CreateDBSubnetGroup",
+        "rds:ModifyDBSubnetGroup",
+        "rds:DescribeDBSubnetGroups",
+        "rds:CreateDBParameterGroup",
+        "rds:ModifyDBParameterGroup",
+        "rds:DescribeDBParameterGroups",
+        "rds:DescribeDBParameters",
+        "rds:ListTagsForResource",
+        "rds:AddTagsToResource"
+      ],
+      "Resource": [
+        "arn:aws:rds:eu-west-2:218549829565:db:godiffy-dev-*",
+        "arn:aws:rds:eu-west-2:218549829565:pg:godiffy-dev-*",
+        "arn:aws:rds:eu-west-2:218549829565:subgrp:godiffy-dev-*"
+      ]
+    },
+    {
+      "Sid": "RegionalDatabaseDiscovery",
+      "Effect": "Allow",
+      "Action": [
+        "rds:DescribeDBEngineVersions",
+        "rds:DescribeOrderableDBInstanceOptions"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "eu-west-2"
+        }
+      }
+    },
+    {
+      "Sid": "OnlyDevSecretContainers",
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:CreateSecret",
+        "secretsmanager:DescribeSecret",
+        "secretsmanager:GetResourcePolicy",
+        "secretsmanager:ListSecretVersionIds",
+        "secretsmanager:TagResource"
+      ],
+      "Resource": [
+        "arn:aws:secretsmanager:eu-west-2:218549829565:secret:godiffy-dev-runtime-*",
+        "arn:aws:secretsmanager:eu-west-2:218549829565:secret:godiffy-dev-migration-*",
+        "arn:aws:secretsmanager:eu-west-2:218549829565:secret:godiffy-dev-smoke-fixtures-*"
+      ]
+    },
+    {
+      "Sid": "RDSManagedSecretCreationOnly",
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:CreateSecret",
+        "secretsmanager:TagResource"
+      ],
+      "Resource": "arn:aws:secretsmanager:eu-west-2:218549829565:secret:rds!db-*",
+      "Condition": {
+        "StringEquals": {
+          "aws:CalledViaLast": "rds.amazonaws.com"
+        },
+        "Bool": {
+          "aws:ViaAWSService": "true"
+        }
+      }
+    },
+    {
+      "Sid": "KeyMetadataNotDecryption",
+      "Effect": "Allow",
+      "Action": "kms:DescribeKey",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "eu-west-2"
+        }
+      }
+    },
+    {
+      "Sid": "DisposableSmokeFixturesOnly",
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:PutSecretValue"
+      ],
+      "Resource": "arn:aws:secretsmanager:eu-west-2:218549829565:secret:godiffy-dev-smoke-fixtures-*"
+    }
+  ]
+}

@@ -15,8 +15,9 @@ locals {
     { name = "DATABASE_NAME", value = "godiffy" },
   ]
   job_types = var.release.image_digest == null ? {} : merge(
-    { migrate = { secret_arn = var.database.migration_secret_arn, role_arn = aws_iam_role.migration.arn } },
-    var.release.bootstrap_enabled ? { bootstrap = { secret_arn = var.database.master_secret_arn, role_arn = aws_iam_role.bootstrap[0].arn } } : {}
+    { migrate = { role_arn = aws_iam_role.migration.arn } },
+    !var.production ? { verify = { role_arn = aws_iam_role.runtime.arn } } : {},
+    var.release.bootstrap_enabled || var.release.bootstrap_retained ? { bootstrap = { role_arn = aws_iam_role.bootstrap[0].arn } } : {}
   )
 }
 
@@ -231,6 +232,12 @@ resource "aws_ecs_task_definition" "job" {
       ], each.key == "bootstrap" ? [
       { name = "DATABASE_SECRET_ARN", value = var.database.runtime_secret_arn },
       { name = "MASTER_SECRET_ARN", value = var.database.master_secret_arn },
+      ] : [], each.key == "verify" ? [
+      { name = "DATABASE_SECRET_ARN", value = var.database.runtime_secret_arn },
+      { name = "MASTER_SECRET_ARN", value = var.database.master_secret_arn },
+      { name = "APP_URL", value = local.origin },
+      { name = "IMAGE_BUCKET", value = var.image_bucket_name },
+      { name = "ALLOW_INSECURE_HTTP", value = var.production ? "false" : "true" },
     ] : [])
     logConfiguration = { logDriver = "awslogs", options = local.log_options }
     linuxParameters  = { initProcessEnabled = true }

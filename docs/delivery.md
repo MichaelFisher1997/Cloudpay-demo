@@ -1,6 +1,6 @@
 # Delivery and approval boundaries
 
-## Implemented: validation only
+## Implemented: credential-free validation
 
 `.github/workflows/validate.yml` runs on pull requests, master pushes and manual
 dispatch. It checks Terraform formatting/validation and mock tests, application
@@ -22,19 +22,62 @@ credential-free validation path, **not AWS deployment**. The actions emitted a
 Node 20 deprecation annotation while running under GitHub's forced Node 24 runtime;
 the workflow succeeded. Review action/runner pins as part of maintenance.
 
-## Proposed privilege boundaries — not provisioned
+## Authorized DEV Actions delivery
 
-Reuse the existing GitHub OIDC **provider**. The existing
+The existing GitHub OIDC **provider** is deliberately reused. The existing
 `cloudpay-demo-github-actions` role trusts the immutable repository identity and
-`master`, and currently has no permissions. Do not recreate the provider or add
-AdministratorAccess. Decide whether to use that role for scoped dev delivery or
-keep its identity-only demonstration purpose; avoid unexplained duplicate roles.
+`master`. The user authorized narrowly scoped DEV permissions on this role and
+requires **all application deployments from Actions**, not the local SSO session.
+The trust policy/provider/profile are unchanged; no AdministratorAccess, IAM user
+or permanent key has been added.
+
+`scripts/ci-policies.py` generates nine reviewable policies under `aws/ci/policies/`:
+five DEV CI scopes and four separate task boundaries. IAM Access Analyzer returned
+no findings for all nine. `scripts/bootstrap-ci.py` human-bootstrapped these exact
+policies; Actions imports their metadata/attachments into DEV state but has no
+permission to edit those policies, attach arbitrary policies or change boundaries.
+Role creation requires the exact role-specific boundary and four ownership tags.
+Runtime/migration/execution boundaries never permit master-secret access. The
+bootstrap boundary initially excludes the unknown master ARN; human bootstrap
+must bind only the actual dedicated DB's secret ARN after foundations.
+
+The user separately approved creation of exactly the missing AWS-managed
+`AWSServiceRoleForRDS` and `AWSServiceRoleForApplicationAutoScaling_ECSService`.
+CI can create only these two service roles, not edit/delete existing service roles.
+All other application writes are dedicated DEV names/ARNs or tag-guarded resources;
+regional discovery uses explicit read actions. Initial scalable-target creation
+requires DEV ownership tags and is tightened to its exact generated ARN afterward.
+RDS-managed master-secret creation/tagging is initially restricted to RDS forward
+access; this authorization path still requires actual AWS verification.
+
+### Manual delivery workflows
+
+- `dev-deploy.yml`: `foundations`, `jobs`, `service`; `plan` defaults to read-only
+  resource planning (with lock acquisition). Apply requires a reviewed semantic
+  plan fingerprint. A fresh saved plan is audited and applied in the same runner;
+  a changed fingerprint, deletion/replacement, production/unrelated resource,
+  domain/ACM input, expensive shape or self-IAM update stops execution.
+- `dev-image.yml`: amd64 build/read-only smoke and immutable commit-tagged push to
+  the exact DEV ECR repository. It reports the manifest digest, not credentials.
+- Private bootstrap/migration/DB-verification jobs run via Actions with no public
+  task IP. Service activation re-verifies the DB before apply, then exercises real
+  HTTP auth/ownership and direct S3 POST/CORS/checksum/size/download/deletion.
+- All deployment workflows share one non-cancelling DEV concurrency group. Only
+  master can assume the role. No environment trust, production authority or PR
+  credentials are introduced. Raw plans/state are never uploaded as artifacts.
+- HTTP test passwords are generated inside the runner and saved only in a
+  dedicated disposable fixture secret. CI cannot read application, migration or
+  RDS master secrets; controlled bootstrap indirect authority is removed afterward.
+
+Terraform remains the task-definition/service owner. Under the current strict
+no-deletion approval, future immutable task-definition replacements fail closed
+and need separate review; `skip_destroy` does not bypass the plan deletion guard.
 
 | Work | Authentication and authority |
 | --- | --- |
 | PR validation | No AWS access, including no state reads |
-| Reviewed planning | Human SSO initially; a later trusted plan role may read exact environment state/resources and write/delete only its lock object |
-| Dev apply/release | A reviewed dev-only role, separate from production permissions; exact dev backend, repository and role/resource boundaries |
+| Reviewed planning | DEV Actions role reads exact DEV state/resources and writes/deletes only its lock during plan |
+| Dev apply/release | Reused, DEV-scoped OIDC role; exact DEV backend, repository, task boundaries and fail-closed reviewed-plan guard |
 | Production apply/release | Separate role trusted only by a protected production GitHub Environment subject, not by unrestricted master jobs |
 | Master DB initialization | Explicit controlled operator job, not routine runtime/CI secret access |
 
@@ -70,8 +113,9 @@ cannot be claimed to have a functioning protected CI deployment path.
   evaluate a permissions boundary and tag/PassRole controls before authorizing CI
   to manage IAM. A prefix by itself is not a complete escalation defense.
 
-No such CI policies, roles, trust changes or environment settings were applied.
-Human SSO remains deliberately privileged; isolate and review commands, never
+Nine dedicated DEV policies and five attachments were bootstrapped. Application
+resources are not yet deployed at this documentation checkpoint. No trust/provider
+or environment-setting change was made. Human SSO remains deliberately privileged; isolate and review commands, never
 treat its profile name as permission to manage other applications.
 
 ## Proposed release sequence

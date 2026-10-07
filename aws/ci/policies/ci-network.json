@@ -1,0 +1,155 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "RegionalDiscovery",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeVpcs",
+        "ec2:DescribeVpcAttribute",
+        "ec2:DescribeSubnets",
+        "ec2:DescribeRouteTables",
+        "ec2:DescribeInternetGateways",
+        "ec2:DescribeSecurityGroups",
+        "ec2:DescribeSecurityGroupRules",
+        "ec2:DescribeVpcEndpoints",
+        "ec2:DescribeVpcEndpointServices",
+        "ec2:DescribePrefixLists",
+        "ec2:DescribeManagedPrefixLists",
+        "ec2:DescribeAvailabilityZones",
+        "ec2:DescribeTags",
+        "ec2:DescribeNetworkInterfaces"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "eu-west-2"
+        }
+      }
+    },
+    {
+      "Sid": "CreateTaggedDevNetwork",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:CreateVpc",
+        "ec2:CreateSubnet",
+        "ec2:CreateRouteTable",
+        "ec2:CreateInternetGateway",
+        "ec2:CreateSecurityGroup",
+        "ec2:CreateVpcEndpoint"
+      ],
+      "Resource": [
+        "arn:aws:ec2:eu-west-2:218549829565:vpc/*",
+        "arn:aws:ec2:eu-west-2:218549829565:subnet/*",
+        "arn:aws:ec2:eu-west-2:218549829565:route-table/*",
+        "arn:aws:ec2:eu-west-2:218549829565:internet-gateway/*",
+        "arn:aws:ec2:eu-west-2:218549829565:security-group/*",
+        "arn:aws:ec2:eu-west-2:218549829565:security-group-rule/*",
+        "arn:aws:ec2:eu-west-2:218549829565:vpc-endpoint/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Project": "godiffy",
+          "aws:RequestTag/Environment": "dev",
+          "aws:RequestTag/ManagedBy": "terraform",
+          "aws:RequestTag/Purpose": "cloudpay-technical-assessment"
+        }
+      }
+    },
+    {
+      "Sid": "TaggedDevParents",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:CreateSubnet",
+        "ec2:CreateRouteTable",
+        "ec2:CreateSecurityGroup",
+        "ec2:CreateVpcEndpoint"
+      ],
+      "Resource": "arn:aws:ec2:eu-west-2:218549829565:vpc/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/Project": "godiffy",
+          "aws:ResourceTag/Environment": "dev"
+        }
+      }
+    },
+    {
+      "Sid": "ModifyOnlyDevNetwork",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:ModifyVpcAttribute",
+        "ec2:AttachInternetGateway",
+        "ec2:AssociateRouteTable",
+        "ec2:CreateRoute",
+        "ec2:AuthorizeSecurityGroupIngress",
+        "ec2:AuthorizeSecurityGroupEgress",
+        "ec2:RevokeSecurityGroupIngress",
+        "ec2:RevokeSecurityGroupEgress",
+        "ec2:ModifyVpcEndpoint"
+      ],
+      "Resource": [
+        "arn:aws:ec2:eu-west-2:218549829565:vpc/*",
+        "arn:aws:ec2:eu-west-2:218549829565:subnet/*",
+        "arn:aws:ec2:eu-west-2:218549829565:route-table/*",
+        "arn:aws:ec2:eu-west-2:218549829565:internet-gateway/*",
+        "arn:aws:ec2:eu-west-2:218549829565:security-group/*",
+        "arn:aws:ec2:eu-west-2:218549829565:security-group-rule/*",
+        "arn:aws:ec2:eu-west-2:218549829565:vpc-endpoint/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/Project": "godiffy",
+          "aws:ResourceTag/Environment": "dev"
+        }
+      }
+    },
+    {
+      "Sid": "CreateTimeNetworkTags",
+      "Effect": "Allow",
+      "Action": "ec2:CreateTags",
+      "Resource": [
+        "arn:aws:ec2:eu-west-2:218549829565:vpc/*",
+        "arn:aws:ec2:eu-west-2:218549829565:subnet/*",
+        "arn:aws:ec2:eu-west-2:218549829565:route-table/*",
+        "arn:aws:ec2:eu-west-2:218549829565:internet-gateway/*",
+        "arn:aws:ec2:eu-west-2:218549829565:security-group/*",
+        "arn:aws:ec2:eu-west-2:218549829565:security-group-rule/*",
+        "arn:aws:ec2:eu-west-2:218549829565:vpc-endpoint/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "ec2:CreateAction": [
+            "CreateVpc",
+            "CreateSubnet",
+            "CreateRouteTable",
+            "CreateInternetGateway",
+            "CreateSecurityGroup",
+            "CreateVpcEndpoint",
+            "AuthorizeSecurityGroupIngress",
+            "AuthorizeSecurityGroupEgress"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "MaintainDevNetworkTags",
+      "Effect": "Allow",
+      "Action": "ec2:CreateTags",
+      "Resource": [
+        "arn:aws:ec2:eu-west-2:218549829565:vpc/*",
+        "arn:aws:ec2:eu-west-2:218549829565:subnet/*",
+        "arn:aws:ec2:eu-west-2:218549829565:route-table/*",
+        "arn:aws:ec2:eu-west-2:218549829565:internet-gateway/*",
+        "arn:aws:ec2:eu-west-2:218549829565:security-group/*",
+        "arn:aws:ec2:eu-west-2:218549829565:security-group-rule/*",
+        "arn:aws:ec2:eu-west-2:218549829565:vpc-endpoint/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/Project": "godiffy",
+          "aws:ResourceTag/Environment": "dev"
+        }
+      }
+    }
+  ]
+}

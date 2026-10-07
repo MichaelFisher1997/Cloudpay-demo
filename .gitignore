@@ -33,3 +33,7 @@ terraform.rc
 .terraform-provider-cache/
 .terraform-validation/
 **/__pycache__/
+
+# Runner-generated deployment identifiers/evidence are not source files.
+terraform/environments/dev/deployment.json
+dev-plan-audit.json

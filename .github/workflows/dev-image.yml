@@ -1,0 +1,44 @@
+name: Godiffy DEV immutable image
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: godiffy-dev-deployment
+  cancel-in-progress: false
+jobs:
+  image:
+    if: github.repository == 'MichaelFisher1997/Cloudpay-demo' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.4.2
+      - name: Assume DEV-scoped repository role
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          aws-region: eu-west-2
+          role-to-assume: arn:aws:iam::218549829565:role/cloudpay-demo-github-actions
+          allowed-account-ids: "218549829565"
+          role-duration-seconds: 900
+          unset-current-credentials: true
+      - name: Build and smoke immutable image
+        run: |
+          docker build --platform linux/amd64 --tag godiffy:validation app
+          bun scripts/smoke-image.ts godiffy:validation
+      - name: Push only to DEV ECR
+        env:
+          REGISTRY: 218549829565.dkr.ecr.eu-west-2.amazonaws.com
+        run: |
+          aws ecr get-login-password --region eu-west-2 | docker login --username AWS --password-stdin "$REGISTRY"
+          docker tag godiffy:validation "$REGISTRY/godiffy-dev-application:$GITHUB_SHA"
+          docker push "$REGISTRY/godiffy-dev-application:$GITHUB_SHA"
+          aws ecr describe-images --region eu-west-2 --repository-name godiffy-dev-application --image-ids "imageTag=$GITHUB_SHA" --query 'imageDetails[0].{digest:imageDigest,tags:imageTags}' --output json | tee image.json
+          cat image.json >> "$GITHUB_STEP_SUMMARY"

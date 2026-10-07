@@ -1,10 +1,11 @@
 variable "release" {
   description = "Default foundations only. Enable jobs/service incrementally with reviewed real image digest."
   type = object({
-    image_digest      = optional(string)
-    bootstrap_enabled = optional(bool, false)
-    service_enabled   = optional(bool, false)
-    database_ready    = optional(bool, false)
+    image_digest       = optional(string)
+    bootstrap_enabled  = optional(bool, false)
+    bootstrap_retained = optional(bool, false)
+    service_enabled    = optional(bool, false)
+    database_ready     = optional(bool, false)
   })
   default = {}
 }

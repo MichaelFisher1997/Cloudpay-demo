@@ -2,6 +2,10 @@ variable "name" { type = string }
 variable "account_id" { type = string }
 variable "production" { type = bool }
 variable "tags" { type = map(string) }
+variable "task_permissions_boundaries" {
+  type    = map(string)
+  default = {}
+}
 variable "network" {
   type = object({
     vpc_id            = string
@@ -62,10 +66,11 @@ variable "invited_emails" {
 }
 variable "release" {
   type = object({
-    image_digest      = optional(string)
-    bootstrap_enabled = optional(bool, false)
-    service_enabled   = optional(bool, false)
-    database_ready    = optional(bool, false)
+    image_digest       = optional(string)
+    bootstrap_enabled  = optional(bool, false)
+    bootstrap_retained = optional(bool, false)
+    service_enabled    = optional(bool, false)
+    database_ready     = optional(bool, false)
   })
   default = {}
   validation {

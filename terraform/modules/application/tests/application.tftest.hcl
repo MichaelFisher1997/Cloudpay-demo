@@ -96,6 +96,24 @@ run "reject_mutable_image" {
   variables { release = { image_digest = "latest" } }
   expect_failures = [var.release]
 }
+run "bootstrap_restricted_and_retained" {
+  command = plan
+  variables {
+    release = { image_digest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", service_enabled = true, database_ready = true, bootstrap_retained = true }
+    task_permissions_boundaries = {
+      runtime = "arn:aws:iam::218549829565:policy/godiffy-dev-boundary-runtime"
+    }
+  }
+  assert {
+    condition = (
+      length(aws_iam_role.bootstrap) == 1 && contains(keys(aws_ecs_task_definition.job), "bootstrap") &&
+      jsondecode(aws_iam_role.bootstrap[0].assume_role_policy).Statement[0].Effect == "Deny" &&
+      jsondecode(aws_iam_role_policy.bootstrap[0].policy).Statement[0].Effect == "Deny" &&
+      aws_iam_role.runtime.permissions_boundary == "arn:aws:iam::218549829565:policy/godiffy-dev-boundary-runtime"
+    )
+    error_message = "Bootstrap retirement must restrict privileges/trust in place, never delete the role or definitions."
+  }
+}
 run "reject_service_before_migrations" {
   command = plan
   variables {

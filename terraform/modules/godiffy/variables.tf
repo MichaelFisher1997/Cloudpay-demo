@@ -9,10 +9,11 @@ variable "environment" {
 
 variable "release" {
   type = object({
-    image_digest      = optional(string)
-    bootstrap_enabled = optional(bool, false)
-    service_enabled   = optional(bool, false)
-    database_ready    = optional(bool, false)
+    image_digest       = optional(string)
+    bootstrap_enabled  = optional(bool, false)
+    bootstrap_retained = optional(bool, false)
+    service_enabled    = optional(bool, false)
+    database_ready     = optional(bool, false)
   })
   default = {}
   validation {
@@ -25,6 +26,7 @@ variable "release" {
 }
 
 variable "app_url" {
+
   type        = string
   description = "Approved HTTPS origin at the final integration stage; null uses dev ALB HTTP."
   default     = null
@@ -33,6 +35,11 @@ variable "app_url" {
     condition     = var.app_url == null || can(regex("^https://[a-z0-9][a-z0-9.-]*[a-z0-9]$", var.app_url))
     error_message = "Custom application URL must be a bare HTTPS origin without path, port, credentials, query or fragment."
   }
+}
+
+variable "task_permissions_boundaries" {
+  type    = map(string)
+  default = {}
 }
 
 variable "certificate_arn" {

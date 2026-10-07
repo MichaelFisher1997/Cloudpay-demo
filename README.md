@@ -12,16 +12,19 @@ operability, and defensible trade-offs**, not application complexity.
   jobs, Docker image, dev/prod Terraform, validation CI, and runbooks.
 - **Saved plans, not applied:** dev foundations **72 additions**; production
   foundations **76 additions**. Both have **zero changes and zero deletions**.
-- No Portyard application infrastructure, existing OIDC permissions, production
-  application resources, or DNS records were changed. No deployment workflow is enabled.
-- **DEV deployment authorized, authentication blocked:** the `portyard` SSO session
-  expired and AWS rejected its refresh token. See [dev deployment status](docs/dev-deployment.md).
+- No Portyard application infrastructure, production application resources or DNS
+  records were changed.
+- **DEV-only Actions rollout authorized:** SSO has been renewed. Nine exact DEV
+  policies (five CI scopes and four task boundaries) were human-bootstrapped onto
+  the deliberately reused OIDC role; its trust/profile are unchanged. Application
+  deployment will use the new manual plan/apply/image Actions workflows only.
+  See [dev deployment status](docs/dev-deployment.md).
 - Plans/state/dependencies and all credentials are excluded from Git.
 - **GitHub validation passed:** [run 37607324492](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37607324492)
   tests/builds the actual committed implementation without AWS credentials.
 
 DEV-only autonomous deployment is now authorized within the agreed architecture
-and safety limits, but has not started without valid AWS authentication. Production
+and safety limits. Application resources are not yet deployed. Production
 and domain/TLS work remain unauthorized. This is not a claim of a running AWS app.
 
 ## Design in brief
@@ -48,14 +51,14 @@ runtime SaaS dependencies in the draft.
 | --- | --- |
 | [Architecture](docs/architecture.md) | Boundaries, modules, decisions and six Well-Architected pillars |
 | [Review handoff](docs/review.md) | Evidence, plan identities, outstanding approvals and next steps |
-| [Dev deployment status](docs/dev-deployment.md) | Current authorization, authentication blocker and rollout checklist |
+| [Dev deployment status](docs/dev-deployment.md) | Current authorization, actual rollout evidence and checklist |
 | [Interview notes](docs/interview.md) | What is actually deployed versus tested locally or only designed |
 | [Costs](docs/costs.md) | Official London prices, assumptions and endpoint/NAT comparison |
 | [Operations](docs/operations.md) | Staged deployment, verification, rollback, recovery and TLS last |
-| [Delivery security](docs/delivery.md) | Validation now; proposed OIDC privilege and production approval boundaries |
+| [Delivery security](docs/delivery.md) | Actions-only DEV rollout, IAM limits and separate production approvals |
 | [State backend](docs/terraform-state.md) | Live backend, migration record, locking and access controls |
 | [Application](app/README.md) | Runtime/job contracts, local tests and known security limits |
-| [OIDC bootstrap](docs/aws-oidc.md) | Existing authentication-only setup, unchanged |
+| [OIDC bootstrap](docs/aws-oidc.md) | Original identity bootstrap; DEV delivery scope is recorded separately |
 
 ## Local verification
 

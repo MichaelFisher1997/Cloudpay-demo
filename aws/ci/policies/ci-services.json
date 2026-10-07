@@ -1,0 +1,168 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "OnlyDevRepository",
+      "Effect": "Allow",
+      "Action": [
+        "ecr:CreateRepository",
+        "ecr:DescribeRepositories",
+        "ecr:ListTagsForResource",
+        "ecr:TagResource",
+        "ecr:PutLifecyclePolicy",
+        "ecr:GetLifecyclePolicy",
+        "ecr:GetRepositoryPolicy",
+        "ecr:PutImageScanningConfiguration",
+        "ecr:DescribeImages",
+        "ecr:DescribeImageScanFindings",
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:InitiateLayerUpload",
+        "ecr:UploadLayerPart",
+        "ecr:CompleteLayerUpload",
+        "ecr:PutImage",
+        "ecr:BatchGetImage",
+        "ecr:GetDownloadUrlForLayer"
+      ],
+      "Resource": "arn:aws:ecr:eu-west-2:218549829565:repository/godiffy-dev-application"
+    },
+    {
+      "Sid": "ECRAuthentication",
+      "Effect": "Allow",
+      "Action": "ecr:GetAuthorizationToken",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "eu-west-2"
+        }
+      }
+    },
+    {
+      "Sid": "ELBReadOnlyDiscovery",
+      "Effect": "Allow",
+      "Action": [
+        "elasticloadbalancing:DescribeLoadBalancers",
+        "elasticloadbalancing:DescribeLoadBalancerAttributes",
+        "elasticloadbalancing:DescribeTargetGroups",
+        "elasticloadbalancing:DescribeTargetGroupAttributes",
+        "elasticloadbalancing:DescribeListeners",
+        "elasticloadbalancing:DescribeListenerAttributes",
+        "elasticloadbalancing:DescribeTags",
+        "elasticloadbalancing:DescribeTargetHealth"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "eu-west-2"
+        }
+      }
+    },
+    {
+      "Sid": "CreateTaggedDevALB",
+      "Effect": "Allow",
+      "Action": [
+        "elasticloadbalancing:CreateLoadBalancer",
+        "elasticloadbalancing:CreateTargetGroup",
+        "elasticloadbalancing:CreateListener"
+      ],
+      "Resource": [
+        "arn:aws:elasticloadbalancing:eu-west-2:218549829565:loadbalancer/app/godiffy-dev-*/*",
+        "arn:aws:elasticloadbalancing:eu-west-2:218549829565:targetgroup/godiffy-dev-*/*",
+        "arn:aws:elasticloadbalancing:eu-west-2:218549829565:listener/app/godiffy-dev-*/*",
+        "arn:aws:elasticloadbalancing:eu-west-2:218549829565:listener-rule/app/godiffy-dev-*/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Project": "godiffy",
+          "aws:RequestTag/Environment": "dev",
+          "aws:RequestTag/ManagedBy": "terraform",
+          "aws:RequestTag/Purpose": "cloudpay-technical-assessment"
+        }
+      }
+    },
+    {
+      "Sid": "DevLoadBalancerUpdates",
+      "Effect": "Allow",
+      "Action": [
+        "elasticloadbalancing:ModifyLoadBalancerAttributes",
+        "elasticloadbalancing:ModifyTargetGroupAttributes",
+        "elasticloadbalancing:ModifyTargetGroup",
+        "elasticloadbalancing:ModifyListener",
+        "elasticloadbalancing:AddTags"
+      ],
+      "Resource": [
+        "arn:aws:elasticloadbalancing:eu-west-2:218549829565:loadbalancer/app/godiffy-dev-*/*",
+        "arn:aws:elasticloadbalancing:eu-west-2:218549829565:targetgroup/godiffy-dev-*/*",
+        "arn:aws:elasticloadbalancing:eu-west-2:218549829565:listener/app/godiffy-dev-*/*",
+        "arn:aws:elasticloadbalancing:eu-west-2:218549829565:listener-rule/app/godiffy-dev-*/*"
+      ]
+    },
+    {
+      "Sid": "OnlyDevLogs",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:PutRetentionPolicy",
+        "logs:TagResource",
+        "logs:ListTagsForResource",
+        "logs:ListTagsLogGroup",
+        "logs:GetLogEvents",
+        "logs:FilterLogEvents",
+        "logs:DescribeLogStreams"
+      ],
+      "Resource": [
+        "arn:aws:logs:eu-west-2:218549829565:log-group:/ecs/godiffy-dev-application:*",
+        "arn:aws:logs:eu-west-2:218549829565:log-group:/aws/rds/instance/godiffy-dev-postgres/postgresql:*"
+      ]
+    },
+    {
+      "Sid": "RegionalLogDiscovery",
+      "Effect": "Allow",
+      "Action": "logs:DescribeLogGroups",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "eu-west-2"
+        }
+      }
+    },
+    {
+      "Sid": "OnlyDevAlarms",
+      "Effect": "Allow",
+      "Action": [
+        "cloudwatch:PutMetricAlarm",
+        "cloudwatch:DescribeAlarms",
+        "cloudwatch:ListTagsForResource",
+        "cloudwatch:TagResource"
+      ],
+      "Resource": "arn:aws:cloudwatch:eu-west-2:218549829565:alarm:godiffy-dev-*"
+    },
+    {
+      "Sid": "RegionalMetricsRead",
+      "Effect": "Allow",
+      "Action": [
+        "cloudwatch:GetMetricData",
+        "cloudwatch:GetMetricStatistics",
+        "cloudwatch:ListMetrics"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "eu-west-2"
+        }
+      }
+    },
+    {
+      "Sid": "OnlyDevAlarmTopic",
+      "Effect": "Allow",
+      "Action": [
+        "sns:CreateTopic",
+        "sns:GetTopicAttributes",
+        "sns:SetTopicAttributes",
+        "sns:TagResource",
+        "sns:ListTagsForResource",
+        "sns:ListSubscriptionsByTopic"
+      ],
+      "Resource": "arn:aws:sns:eu-west-2:218549829565:godiffy-dev-alarms"
+    }
+  ]
+}

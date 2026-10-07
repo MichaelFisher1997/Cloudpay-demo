@@ -1,0 +1,144 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "OnlyDevCluster",
+      "Effect": "Allow",
+      "Action": [
+        "ecs:CreateCluster",
+        "ecs:DescribeClusters",
+        "ecs:UpdateClusterSettings",
+        "ecs:TagResource",
+        "ecs:ListTagsForResource"
+      ],
+      "Resource": "arn:aws:ecs:eu-west-2:218549829565:cluster/godiffy-dev-cluster"
+    },
+    {
+      "Sid": "OnlyTaggedDevTaskDefinitions",
+      "Effect": "Allow",
+      "Action": "ecs:RegisterTaskDefinition",
+      "Resource": "arn:aws:ecs:eu-west-2:218549829565:task-definition/godiffy-dev-*:*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Project": "godiffy",
+          "aws:RequestTag/Environment": "dev",
+          "aws:RequestTag/ManagedBy": "terraform",
+          "aws:RequestTag/Purpose": "cloudpay-technical-assessment"
+        }
+      }
+    },
+    {
+      "Sid": "OnlyDevTaskDefinitionMetadata",
+      "Effect": "Allow",
+      "Action": [
+        "ecs:DescribeTaskDefinition",
+        "ecs:ListTagsForResource",
+        "ecs:TagResource"
+      ],
+      "Resource": "arn:aws:ecs:eu-west-2:218549829565:task-definition/godiffy-dev-*:*"
+    },
+    {
+      "Sid": "OnlyDevService",
+      "Effect": "Allow",
+      "Action": [
+        "ecs:CreateService",
+        "ecs:UpdateService",
+        "ecs:DescribeServices",
+        "ecs:ListTagsForResource",
+        "ecs:TagResource"
+      ],
+      "Resource": "arn:aws:ecs:eu-west-2:218549829565:service/godiffy-dev-cluster/godiffy-dev-web"
+    },
+    {
+      "Sid": "PrivateDevJobs",
+      "Effect": "Allow",
+      "Action": "ecs:RunTask",
+      "Resource": "arn:aws:ecs:eu-west-2:218549829565:task-definition/godiffy-dev-*:*",
+      "Condition": {
+        "ArnEquals": {
+          "ecs:cluster": "arn:aws:ecs:eu-west-2:218549829565:cluster/godiffy-dev-cluster"
+        }
+      }
+    },
+    {
+      "Sid": "OnlyDevTaskStatusAndRecovery",
+      "Effect": "Allow",
+      "Action": [
+        "ecs:DescribeTasks",
+        "ecs:StopTask"
+      ],
+      "Resource": "arn:aws:ecs:eu-west-2:218549829565:task/godiffy-dev-cluster/*"
+    },
+    {
+      "Sid": "TagDevJobTasks",
+      "Effect": "Allow",
+      "Action": "ecs:TagResource",
+      "Resource": "arn:aws:ecs:eu-west-2:218549829565:task/godiffy-dev-cluster/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Project": "godiffy",
+          "aws:RequestTag/Environment": "dev",
+          "aws:RequestTag/ManagedBy": "terraform",
+          "aws:RequestTag/Purpose": "cloudpay-technical-assessment"
+        }
+      }
+    },
+    {
+      "Sid": "CreateTaggedDevScalingTarget",
+      "Effect": "Allow",
+      "Action": [
+        "application-autoscaling:RegisterScalableTarget",
+        "application-autoscaling:TagResource"
+      ],
+      "Resource": "arn:aws:application-autoscaling:eu-west-2:218549829565:scalable-target/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "eu-west-2",
+          "aws:RequestTag/Project": "godiffy",
+          "aws:RequestTag/Environment": "dev",
+          "aws:RequestTag/ManagedBy": "terraform",
+          "aws:RequestTag/Purpose": "cloudpay-technical-assessment"
+        },
+        "StringEqualsIfExists": {
+          "application-autoscaling:service-namespace": "ecs",
+          "application-autoscaling:scalable-dimension": "ecs:service:DesiredCount"
+        },
+        "Null": {
+          "aws:ResourceTag/Project": "true"
+        }
+      }
+    },
+    {
+      "Sid": "OnlyExistingDevScalingTarget",
+      "Effect": "Allow",
+      "Action": [
+        "application-autoscaling:RegisterScalableTarget",
+        "application-autoscaling:PutScalingPolicy",
+        "application-autoscaling:TagResource"
+      ],
+      "Resource": "arn:aws:application-autoscaling:eu-west-2:218549829565:scalable-target/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "eu-west-2",
+          "aws:ResourceTag/Project": "godiffy",
+          "aws:ResourceTag/Environment": "dev"
+        }
+      }
+    },
+    {
+      "Sid": "RegionalScalingRead",
+      "Effect": "Allow",
+      "Action": [
+        "application-autoscaling:DescribeScalableTargets",
+        "application-autoscaling:DescribeScalingPolicies",
+        "application-autoscaling:ListTagsForResource"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "eu-west-2"
+        }
+      }
+    }
+  ]
+}

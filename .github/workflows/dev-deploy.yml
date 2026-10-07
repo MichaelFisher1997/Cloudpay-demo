@@ -1,0 +1,141 @@
+name: Godiffy DEV deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      phase:
+        type: choice
+        options: [foundations, jobs, service]
+        required: true
+      operation:
+        type: choice
+        options: [plan, apply]
+        default: plan
+        required: true
+      image_digest:
+        type: string
+        description: Existing immutable DEV ECR digest for jobs/service
+      expected_fingerprint:
+        type: string
+        description: Required for apply; copy from reviewed plan run
+
+permissions:
+  contents: read
+
+concurrency:
+  group: godiffy-dev-deployment
+  cancel-in-progress: false
+
+jobs:
+  dev:
+    if: github.repository == 'MichaelFisher1997/Cloudpay-demo' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: eu-west-2
+      AWS_PAGER: ""
+      TF_IN_AUTOMATION: "true"
+      TF_WORKSPACE: default
+      PHASE: ${{ inputs.phase }}
+      OPERATION: ${{ inputs.operation }}
+      IMAGE_DIGEST: ${{ inputs.image_digest }}
+      EXPECTED_FINGERPRINT: ${{ inputs.expected_fingerprint }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: 1.16.5
+          terraform_wrapper: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.4.2
+      - name: Validate release inputs before AWS access
+        run: |
+          python3 - <<'PY'
+          import json,os,re
+          from pathlib import Path
+          phase=os.environ['PHASE']
+          digest=os.environ['IMAGE_DIGEST']
+          if phase != 'foundations' and not re.fullmatch(r'sha256:[a-f0-9]{64}',digest):
+              raise SystemExit('A real immutable DEV image digest is required')
+          if os.environ['OPERATION']=='apply' and not re.fullmatch(r'[a-f0-9]{64}',os.environ['EXPECTED_FINGERPRINT']):
+              raise SystemExit('Review a plan run and supply its exact fingerprint before apply')
+          release={} if phase=='foundations' else dict(image_digest=digest,bootstrap_enabled=phase=='jobs',bootstrap_retained=True,service_enabled=phase=='service',database_ready=phase=='service')
+          value=dict(release=release,invited_emails=['smoke-owner@godiffy.invalid','smoke-other@godiffy.invalid','interview@godiffy.invalid'])
+          path=Path('terraform/environments/dev/ci-release.local.tfvars.json')
+          path.write_text(json.dumps(value));path.chmod(0o600)
+          PY
+      - name: Assume existing repository role using OIDC
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          aws-region: eu-west-2
+          role-to-assume: arn:aws:iam::218549829565:role/cloudpay-demo-github-actions
+          allowed-account-ids: "218549829565"
+          role-duration-seconds: 3600
+          role-session-name: godiffy-dev-${{ github.run_id }}
+          unset-current-credentials: true
+      - name: Initialize DEV state only
+        run: |
+          terraform -chdir=terraform/environments/dev init -input=false -lockfile=readonly -backend-config=backend.hcl
+          terraform -chdir=terraform/environments/dev validate
+      - name: Saved DEV plan
+        run: |
+          umask 077
+          terraform -chdir=terraform/environments/dev plan -input=false -no-color -lock-timeout=120s -var-file=ci-release.local.tfvars.json -out=dev.tfplan
+      - name: Fail-closed scope and plan review fingerprint
+        run: |
+          python3 scripts/check-dev-plan.py "$PHASE" terraform/environments/dev/dev.tfplan --expected "$EXPECTED_FINGERPRINT" | tee dev-plan-audit.json
+          cat dev-plan-audit.json >> "$GITHUB_STEP_SUMMARY"
+      - name: Apply only the reviewed saved DEV plan
+        if: inputs.operation == 'apply'
+        run: |
+          if [ "$PHASE" = service ]; then
+            terraform -chdir=terraform/environments/dev output -json > terraform/environments/dev/deployment.json
+            python3 scripts/run-dev-job.py verify
+          fi
+          terraform -chdir=terraform/environments/dev apply -input=false -no-color dev.tfplan
+      - name: Capture non-secret DEV integration identifiers
+        if: inputs.operation == 'apply'
+        run: |
+          umask 077
+          terraform -chdir=terraform/environments/dev output -json > terraform/environments/dev/deployment.json
+          python3 - <<'PY'
+          import json,os
+          d=json.load(open('terraform/environments/dev/deployment.json'))
+          v=d['deployment']['value']
+          with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as f:
+              f.write('\nDEV outputs (non-secret):\n\n```json\n'+json.dumps(d,indent=2)+'\n```\n')
+          PY
+      - name: Private database bootstrap and migration jobs
+        if: inputs.operation == 'apply' && inputs.phase == 'jobs'
+        run: |
+          python3 scripts/run-dev-job.py bootstrap
+          python3 scripts/run-dev-job.py migrate
+          python3 scripts/run-dev-job.py verify
+      - name: Real DEV HTTP and S3 integration smoke
+        if: inputs.operation == 'apply' && inputs.phase == 'service'
+        working-directory: app
+        run: |
+          bun install --frozen-lockfile
+          python3 - <<'PY'
+          import json,os
+          d=json.load(open('../terraform/environments/dev/deployment.json'))
+          v=d['deployment']['value']
+          with open(os.environ['GITHUB_ENV'],'a') as f:
+              for k,value in dict(APP_URL=v['application_origin'],IMAGE_BUCKET=v['image_bucket_name'],SMOKE_SECRET_ARN=d['smoke_secret_arn']['value']).items():
+                  f.write(k+'='+value+'\n')
+          PY
+      - name: Verify the complete deployed application path
+        if: inputs.operation == 'apply' && inputs.phase == 'service'
+        working-directory: app
+        run: |
+          bun run smoke:aws
+          cat /tmp/godiffyAWSsmoke.json >> "$GITHUB_STEP_SUMMARY"
+      - name: Verify converged DEV plan
+        if: inputs.operation == 'apply'
+        run: terraform -chdir=terraform/environments/dev plan -input=false -no-color -detailed-exitcode -lock-timeout=120s -var-file=ci-release.local.tfvars.json

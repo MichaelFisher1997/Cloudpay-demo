@@ -42,15 +42,16 @@ module "database" {
 }
 
 module "application" {
-  source                 = "../application"
-  name                   = local.name
-  account_id             = local.account_id
-  production             = local.production
-  release                = var.release
-  app_url                = local.production ? coalesce(var.app_url, "https://godiffy.com") : var.app_url
-  certificate_arn        = var.certificate_arn
-  https_redirect_enabled = var.https_redirect_enabled
-  invited_emails         = var.invited_emails
+  source                      = "../application"
+  name                        = local.name
+  account_id                  = local.account_id
+  production                  = local.production
+  release                     = var.release
+  app_url                     = local.production ? coalesce(var.app_url, "https://godiffy.com") : var.app_url
+  certificate_arn             = var.certificate_arn
+  https_redirect_enabled      = var.https_redirect_enabled
+  invited_emails              = var.invited_emails
+  task_permissions_boundaries = var.task_permissions_boundaries
   network = {
     vpc_id            = module.networking.vpc_id
     public_subnet_ids = module.networking.public_subnet_ids

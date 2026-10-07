@@ -1,0 +1,190 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadOnlyDedicatedRoles",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetRole",
+        "iam:GetRolePolicy",
+        "iam:ListRolePolicies",
+        "iam:ListAttachedRolePolicies"
+      ],
+      "Resource": [
+        "arn:aws:iam::218549829565:role/cloudpay-demo-github-actions",
+        "arn:aws:iam::218549829565:role/godiffy-dev-execution",
+        "arn:aws:iam::218549829565:role/godiffy-dev-runtime",
+        "arn:aws:iam::218549829565:role/godiffy-dev-migration",
+        "arn:aws:iam::218549829565:role/godiffy-dev-bootstrap"
+      ]
+    },
+    {
+      "Sid": "ReadOnlyCIAndBoundaryPolicies",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetPolicy",
+        "iam:GetPolicyVersion"
+      ],
+      "Resource": "arn:aws:iam::218549829565:policy/godiffy-dev-*"
+    },
+    {
+      "Sid": "CreateBoundedExecutionRole",
+      "Effect": "Allow",
+      "Action": "iam:CreateRole",
+      "Resource": "arn:aws:iam::218549829565:role/godiffy-dev-execution",
+      "Condition": {
+        "StringEquals": {
+          "iam:PermissionsBoundary": "arn:aws:iam::218549829565:policy/godiffy-dev-boundary-execution",
+          "aws:RequestTag/Project": "godiffy",
+          "aws:RequestTag/Environment": "dev",
+          "aws:RequestTag/ManagedBy": "terraform",
+          "aws:RequestTag/Purpose": "cloudpay-technical-assessment"
+        }
+      }
+    },
+    {
+      "Sid": "OnlyBoundedExecutionInlinePolicy",
+      "Effect": "Allow",
+      "Action": "iam:PutRolePolicy",
+      "Resource": "arn:aws:iam::218549829565:role/godiffy-dev-execution",
+      "Condition": {
+        "StringEquals": {
+          "iam:PermissionsBoundary": "arn:aws:iam::218549829565:policy/godiffy-dev-boundary-execution",
+          "iam:ResourceTag/Project": "godiffy",
+          "iam:ResourceTag/Environment": "dev"
+        }
+      }
+    },
+    {
+      "Sid": "CreateBoundedRuntimeRole",
+      "Effect": "Allow",
+      "Action": "iam:CreateRole",
+      "Resource": "arn:aws:iam::218549829565:role/godiffy-dev-runtime",
+      "Condition": {
+        "StringEquals": {
+          "iam:PermissionsBoundary": "arn:aws:iam::218549829565:policy/godiffy-dev-boundary-runtime",
+          "aws:RequestTag/Project": "godiffy",
+          "aws:RequestTag/Environment": "dev",
+          "aws:RequestTag/ManagedBy": "terraform",
+          "aws:RequestTag/Purpose": "cloudpay-technical-assessment"
+        }
+      }
+    },
+    {
+      "Sid": "OnlyBoundedRuntimeInlinePolicy",
+      "Effect": "Allow",
+      "Action": "iam:PutRolePolicy",
+      "Resource": "arn:aws:iam::218549829565:role/godiffy-dev-runtime",
+      "Condition": {
+        "StringEquals": {
+          "iam:PermissionsBoundary": "arn:aws:iam::218549829565:policy/godiffy-dev-boundary-runtime",
+          "iam:ResourceTag/Project": "godiffy",
+          "iam:ResourceTag/Environment": "dev"
+        }
+      }
+    },
+    {
+      "Sid": "CreateBoundedMigrationRole",
+      "Effect": "Allow",
+      "Action": "iam:CreateRole",
+      "Resource": "arn:aws:iam::218549829565:role/godiffy-dev-migration",
+      "Condition": {
+        "StringEquals": {
+          "iam:PermissionsBoundary": "arn:aws:iam::218549829565:policy/godiffy-dev-boundary-migration",
+          "aws:RequestTag/Project": "godiffy",
+          "aws:RequestTag/Environment": "dev",
+          "aws:RequestTag/ManagedBy": "terraform",
+          "aws:RequestTag/Purpose": "cloudpay-technical-assessment"
+        }
+      }
+    },
+    {
+      "Sid": "OnlyBoundedMigrationInlinePolicy",
+      "Effect": "Allow",
+      "Action": "iam:PutRolePolicy",
+      "Resource": "arn:aws:iam::218549829565:role/godiffy-dev-migration",
+      "Condition": {
+        "StringEquals": {
+          "iam:PermissionsBoundary": "arn:aws:iam::218549829565:policy/godiffy-dev-boundary-migration",
+          "iam:ResourceTag/Project": "godiffy",
+          "iam:ResourceTag/Environment": "dev"
+        }
+      }
+    },
+    {
+      "Sid": "CreateBoundedBootstrapRole",
+      "Effect": "Allow",
+      "Action": "iam:CreateRole",
+      "Resource": "arn:aws:iam::218549829565:role/godiffy-dev-bootstrap",
+      "Condition": {
+        "StringEquals": {
+          "iam:PermissionsBoundary": "arn:aws:iam::218549829565:policy/godiffy-dev-boundary-bootstrap",
+          "aws:RequestTag/Project": "godiffy",
+          "aws:RequestTag/Environment": "dev",
+          "aws:RequestTag/ManagedBy": "terraform",
+          "aws:RequestTag/Purpose": "cloudpay-technical-assessment"
+        }
+      }
+    },
+    {
+      "Sid": "OnlyBoundedBootstrapInlinePolicy",
+      "Effect": "Allow",
+      "Action": "iam:PutRolePolicy",
+      "Resource": "arn:aws:iam::218549829565:role/godiffy-dev-bootstrap",
+      "Condition": {
+        "StringEquals": {
+          "iam:PermissionsBoundary": "arn:aws:iam::218549829565:policy/godiffy-dev-boundary-bootstrap",
+          "iam:ResourceTag/Project": "godiffy",
+          "iam:ResourceTag/Environment": "dev"
+        }
+      }
+    },
+    {
+      "Sid": "OnlyDevTaskTrustAndTags",
+      "Effect": "Allow",
+      "Action": [
+        "iam:UpdateAssumeRolePolicy",
+        "iam:TagRole"
+      ],
+      "Resource": [
+        "arn:aws:iam::218549829565:role/godiffy-dev-execution",
+        "arn:aws:iam::218549829565:role/godiffy-dev-runtime",
+        "arn:aws:iam::218549829565:role/godiffy-dev-migration",
+        "arn:aws:iam::218549829565:role/godiffy-dev-bootstrap"
+      ]
+    },
+    {
+      "Sid": "PassOnlyDevECSTaskRoles",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": [
+        "arn:aws:iam::218549829565:role/godiffy-dev-execution",
+        "arn:aws:iam::218549829565:role/godiffy-dev-runtime",
+        "arn:aws:iam::218549829565:role/godiffy-dev-migration",
+        "arn:aws:iam::218549829565:role/godiffy-dev-bootstrap"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "iam:PassedToService": "ecs-tasks.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Sid": "ExactlyApprovedMissingServiceRoles",
+      "Effect": "Allow",
+      "Action": "iam:CreateServiceLinkedRole",
+      "Resource": [
+        "arn:aws:iam::218549829565:role/aws-service-role/rds.amazonaws.com/AWSServiceRoleForRDS",
+        "arn:aws:iam::218549829565:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "iam:AWSServiceName": [
+            "rds.amazonaws.com",
+            "ecs.application-autoscaling.amazonaws.com"
+          ]
+        }
+      }
+    }
+  ]
+}

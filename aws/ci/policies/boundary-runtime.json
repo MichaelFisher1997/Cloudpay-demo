@@ -1,0 +1,31 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "RuntimeSecretOnly",
+      "Effect": "Allow",
+      "Action": "secretsmanager:GetSecretValue",
+      "Resource": "arn:aws:secretsmanager:eu-west-2:218549829565:secret:godiffy-dev-runtime-*"
+    },
+    {
+      "Sid": "PendingUploads",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:GetObject",
+        "s3:GetObjectVersion"
+      ],
+      "Resource": "arn:aws:s3:::godiffy-dev-images-218549829565-eu-west-2/pending/*"
+    },
+    {
+      "Sid": "PinnedImages",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:GetObjectVersion",
+        "s3:DeleteObjectVersion"
+      ],
+      "Resource": "arn:aws:s3:::godiffy-dev-images-218549829565-eu-west-2/images/*"
+    }
+  ]
+}
