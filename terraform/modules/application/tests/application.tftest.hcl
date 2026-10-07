@@ -100,9 +100,10 @@ run "bootstrap_restricted_and_retained" {
   command = plan
   variables {
     release = {
-      image_digest           = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      retained_image_digests = ["sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]
-      service_enabled        = true, database_ready = true, bootstrap_retained = true
+      image_digest                     = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      retained_image_digests           = ["sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]
+      retained_bootstrap_image_digests = ["sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]
+      service_enabled                  = true, database_ready = true, bootstrap_retained = true
     }
     task_permissions_boundaries = {
       runtime = "arn:aws:iam::218549829565:policy/godiffy-dev-boundary-runtime"
@@ -122,9 +123,10 @@ run "new_image_retains_previous_definitions" {
   command = plan
   variables {
     release = {
-      image_digest           = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-      retained_image_digests = ["sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]
-      bootstrap_retained     = true, service_enabled = true, database_ready = true
+      image_digest                     = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      retained_image_digests           = ["sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]
+      retained_bootstrap_image_digests = ["sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]
+      bootstrap_retained               = true, service_enabled = true, database_ready = true
     }
   }
   assert {
@@ -134,6 +136,21 @@ run "new_image_retains_previous_definitions" {
       contains(keys(aws_ecs_task_definition.web), var.release.image_digest)
     )
     error_message = "New images must retain earlier immutable definitions without deletion."
+  }
+}
+run "repeat_new_release_does_not_create_retired_bootstrap" {
+  command = plan
+  variables {
+    release = {
+      image_digest                     = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      retained_image_digests           = ["sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"]
+      retained_bootstrap_image_digests = ["sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]
+      bootstrap_retained               = true, service_enabled = true, database_ready = true
+    }
+  }
+  assert {
+    condition     = length(aws_ecs_task_definition.job) == 5 && !contains(keys(aws_ecs_task_definition.job), "${var.release.image_digest}/bootstrap")
+    error_message = "Re-planning a new release must never create a fresh retired bootstrap definition."
   }
 }
 run "reject_service_before_migrations" {

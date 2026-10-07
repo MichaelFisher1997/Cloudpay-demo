@@ -1,4 +1,4 @@
-# Godiffy platform architecture — draft for approval
+# Godiffy platform architecture — deployed DEV, proposed production
 
 ## Scope and boundaries
 
@@ -7,18 +7,17 @@ Target account `218549829565`, London `eu-west-2`; dedicated names
 `Environment=dev|prod`, `ManagedBy=terraform`,
 `Purpose=cloudpay-technical-assessment`.
 
-Only the state backend has been applied and verified. DEV-only autonomous deployment
-is now approved, but blocked by expired SSO authentication; see
-[deployment status](dev-deployment.md). The resources below are still proposed,
-not an inventory of a running DEV platform. Production and domain/TLS work are
-not authorized. The `portyard` SSO
+The backend and DEV platform have been deployed through GitHub Actions; see
+[deployment status](dev-deployment.md) for the current digest, inventory and actual
+verification evidence. The production column remains a design, not deployed resources.
+Production and domain/TLS work are not authorized. The `portyard` SSO
 profile and `PortyardAdministrator` identity remain intact and are human credentials
 only. No Portyard VPC, application, database, bucket or state is referenced/imported.
 No AWS keys, IAM users, new OIDC provider, or AdministratorAccess CI grant is needed.
 
 ## Runtime and networking
 
-| Concern | Dev draft | Production draft |
+| Concern | Approved DEV design | Production draft |
 | --- | --- | --- |
 | VPC | Dedicated `10.42.0.0/16` | Dedicated `10.43.0.0/16` |
 | Subnets | Public, task, isolated DB pair in `eu-west-2a/b` | Same six-subnet pattern |
@@ -53,6 +52,9 @@ would require an explicit networking change; none is silently assumed to work.
 One dev endpoint AZ is an intentional availability compromise. Pinning the dev
 task there avoids cross-AZ pulls. Production endpoints exist in both AZs. See
 [costs](costs.md) for zonal/regional NAT alternatives and current billing.
+The actual DEV task/endpoints use `eu-west-2a`, while RDS selected `eu-west-2b`.
+Database traffic therefore crosses AZs; account for transfer/latency rather than
+replacing the healthy database merely to align placements.
 
 ## Application and data flow
 
@@ -100,14 +102,14 @@ schema-owner job performs serialized, reviewed migrations.
 | Execution | Pull dedicated ECR repository and write dedicated log streams; ECR auth token requires `Resource=*` |
 | Runtime | Read runtime secret only; narrowly scoped pending/image S3 object actions |
 | Migration | Read schema-owner secret only; no master secret or secret writes |
-| Bootstrap, explicitly temporary | Read dedicated master/runtime/migration secrets; write only the two app secrets |
+| Bootstrap, initialization only | Initially read exact master/runtime/migration secrets and write the two app secrets; now retained with denied trust/secret access and no CI `PassRole` |
 
-Service activation cannot coexist with enabled bootstrap privilege. Removing that
-role/definition is a reviewed IAM cleanup, never an automatic unapproved deletion.
+Service activation cannot coexist with enabled bootstrap privilege. The denied
+role/definition are retained; deleting them needs separate approved IAM cleanup.
 The runtime SQL user has DML, not schema ownership/DDL. Jobs do not run during
 Terraform apply via `local-exec`; operators run and check them after approved plans.
 
-Default AWS-managed encryption is proposed: SSE-S3, RDS/Secrets Manager managed
+DEV uses default AWS-managed encryption: SSE-S3, RDS/Secrets Manager managed
 keys. A customer-managed KMS key adds cost, lifecycle and permissions complexity;
 it needs a stated compliance/control requirement rather than being decorative.
 RDS master rotation is AWS-managed; app credentials are cached per process and
@@ -139,7 +141,8 @@ and service configuration, avoiding a second conflicting deployment owner.
 Production guards require TLS, migrations acknowledged, an alarm recipient and
 an explicit review switch. Terraform booleans are not organizational approval
 boundaries: IAM/GitHub Environment protections must enforce that separately.
-No deploy permissions/workflow has been enabled; see [delivery](delivery.md).
+DEV-only OIDC delivery is enabled and tested; no production deployment authority
+was granted. See [delivery](delivery.md).
 
 ## Six Well-Architected pillars
 

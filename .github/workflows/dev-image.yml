@@ -3,6 +3,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+defaults:
+  run:
+    shell: bash
 concurrency:
   group: godiffy-dev-deployment
   cancel-in-progress: false

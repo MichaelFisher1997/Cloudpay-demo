@@ -8,4 +8,5 @@ output "cluster_name" { value = aws_ecs_cluster.this.name }
 output "service_name" { value = var.release.service_enabled ? aws_ecs_service.this[0].name : null }
 output "job_task_definitions" { value = { for key, job in local.job_definitions : job.kind => aws_ecs_task_definition.job[key].arn if split("/", key)[0] == var.release.image_digest } }
 output "retained_image_digests" { value = local.release_digests }
+output "bootstrap_image_digests" { value = toset([for key, job in local.job_definitions : split("/", key)[0] if job.kind == "bootstrap"]) }
 output "log_group_name" { value = aws_cloudwatch_log_group.application.name }

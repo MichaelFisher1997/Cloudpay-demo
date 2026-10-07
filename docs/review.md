@@ -1,11 +1,12 @@
-# Review handoff — build and plan only
+# Historical review handoff — build-and-plan stage
 
-> This records the completed build-and-plan stage. Subsequent DEV-only autonomous
-> deployment has been authorized, but is currently blocked by expired AWS SSO
-> authentication. See [current deployment status](dev-deployment.md). The plans
-> below have not been applied; production remains unauthorized.
+> This preserves the earlier build-and-plan evidence, not the current inventory.
+> DEV was subsequently deployed through GitHub Actions after SSO renewal. See
+> [the current deployment handoff](dev-deployment.md) for URL/digests, actual AWS
+> results, costs and [separately approved retirement](teardown.md). The historical
+> plans below are not safe retry inputs; production remains unauthorized.
 
-## What is live
+## What was live at that stage
 
 The approved dedicated bucket `godiffy-terraform-state-218549829565-eu-west-2`
 and five configuration resources in account `218549829565`, London. Apply:
@@ -65,7 +66,7 @@ master-access bootstrap roles, customer KMS keys, NAT, ACM/DNS, or CI deployment
 roles/policies. RDS-generated master secret creation is managed by RDS and is not
 a Terraform secret-value resource. Tagged ECR release images are retained.
 
-## Verification evidence and its limits
+## Verification evidence and its limits at that stage
 
 - Terraform formatting and all eight root/module configurations validated;
   **24 mocked Terraform test runs** pass, including negative namespace/AZ/image,
@@ -100,7 +101,7 @@ behavior, real Secrets Manager job writes, S3 browser POST/checksum/CORS, IAM
 authorization, ALB service health/log delivery, SNS subscription confirmation,
 prod AZ failover, restoration or load/cost measurements. No website URL is live.
 
-## Decisions requiring user review
+## Decisions recorded at that stage
 
 1. Endpoint-only design and one-AZ dev compromise; sizing, budget/alert recipient
    and continuous foundation costs ([costs](costs.md)).
@@ -122,4 +123,6 @@ and narrowly scoped DEV CI permissions are now authorized. Re-plan and enforce
 the user's stop-on-deletion/unrelated-resource rules before each apply. Restrict
 temporary bootstrap privileges without deleting resources under this authorization.
 Production, ACM and domain/DNS work remain forbidden. AWS authentication must be
-restored before proceeding; no application deployment is claimed.
+restored before proceeding at that historical checkpoint. That renewal and DEV
+deployment have since occurred; use the current deployment record, not this old
+"not verified in AWS" list, for present-day claims.

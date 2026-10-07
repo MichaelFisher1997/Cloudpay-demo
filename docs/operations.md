@@ -13,8 +13,9 @@ Never operate on Portyard resources; use exact Godiffy identifiers from outputs.
 
 Confirm architecture, proposed endpoint design, DB sizing/retention, budgets and
 alert recipient. Default dev/prod roots contain foundations only; no placeholder
-task image or automatically executed DB job. The dev bundle currently plans 72
-additions; prod 76. These are **combined design-review plans**, not approval to
+task image or automatically executed DB job. The DEV foundation rollout created 73
+new records and imported 14 exact CI policies/attachments; the old production
+foundation design plan has 76 additions, never applied. These are review counts, not approval to
 skip the agreed incremental review. If smaller infrastructure slices are desired,
 prepare/review a staged code change; do not normalize routine `-target` deployment.
 
@@ -59,6 +60,9 @@ After an approved ECR foundation apply, dispatch `dev-image.yml` to build linux/
 `godiffy-dev-application` repository with an immutable unique release tag, inspect
 ECR scan results, and record the manifest digest. Runtime never downloads packages
 or public CA bundles: the image contains code/dependencies and the public RDS CA.
+Image publication and jobs/service plans now fail closed unless that exact digest
+has a completed ECR OS scan without critical/high findings. Do not roll back to the
+retained initial Debian digest with known severe findings; select a scan-clean artifact.
 
 Dispatch the job-definition plan with the actual reported digest:
 
@@ -93,7 +97,9 @@ GitHub plaintext outputs, local tfvars, container layers or logs.
 After successful migration, restrict temporary bootstrap privileges. The service
 phase sets `bootstrap_enabled=false` and `bootstrap_retained=true`: the role's
 trust and secret policy become explicit denials, while resources/definitions remain.
-The current authorization forbids applying plans with resource deletions, even
+Human retirement additionally denies all bootstrap secret access in its boundary
+and removes CI bootstrap `PassRole`; Actions cannot restore those human-owned
+permissions. The current authorization forbids applying plans with resource deletions, even
 for this cleanup. Service validation rejects leaving master-access bootstrap enabled.
 
 ## 4. Activate dev service and verify core behavior
@@ -103,7 +109,7 @@ bootstrap/ready-database/service inputs and approved **disposable DEV test**
 email allowlist. Addresses are not secrets but are visible in Terraform/task
 configuration. Empty defaults disable registration. Review and approve the saved
 service plan and supply its fingerprint for apply. A private DB verification runs
-again before service apply; HTTP/S3 smoke follows activation. Until separately
+again before service apply and with the released image after apply; HTTP/S3 smoke follows activation. Until separately
 authorized final TLS integration, only the ALB hostname over HTTP works.
 
 Check:
@@ -121,8 +127,10 @@ Check:
 - Load tests validate 512 MiB memory, CPU targets, DB pool/max connections and
   RDS burst-credit usage before any sizing claims or production promotion.
 
-Do not use real/reused passwords or sensitive photos during HTTP bootstrap. No
-real AWS application end-to-end tests have yet been performed.
+Do not use real/reused passwords or sensitive photos during HTTP bootstrap. The
+actual AWS evidence and remaining gaps are in [dev-deployment.md](dev-deployment.md).
+Protocol-level POST/CORS checks do not substitute for an interactive browser or
+production load/restore testing.
 
 ## 5. Domains/TLS — final integration
 
@@ -202,3 +210,5 @@ destructive-action approval. Disable ALB logging before log-bucket retirement.
 Keep final/automated DB backups deliberately; retained snapshots still cost money.
 Never set bucket `force_destroy=true` or recursively delete state/images to make
 Terraform cleanup convenient. Do not delete local state backups without approval.
+See [the exact DEV retirement runbook](teardown.md) for the separately approved
+Actions teardown slice, nonempty bucket/repository safeguards and CI grants removed last.

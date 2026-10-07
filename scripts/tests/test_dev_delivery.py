@@ -22,6 +22,7 @@ db_repair_module = load("repair-dev-db-state.py")
 job_module = load("run-dev-job.py")
 service_repair_module = load("repair-dev-service-state.py")
 scan_module = load("check-image-scan.py")
+revision_module = load("retain-dev-revisions.py")
 
 
 class DevDeliveryTests(unittest.TestCase):
@@ -261,3 +262,30 @@ class ImageScanTests(unittest.TestCase):
         for severity in ("HIGH", "CRITICAL"):
             with self.assertRaises(ValueError):
                 scan_module.audit_scan({**self.scan, "imageScanFindings": {"findingSeverityCounts": {severity: 1}}}, self.digest)
+
+    def test_waits_for_scan_creation_and_completion_but_is_bounded(self):
+        with patch.object(scan_module, "aws", side_effect=[None, {"imageScanStatus": {"status": "IN_PROGRESS"}}, self.scan]), patch.object(scan_module.time, "sleep") as pause:
+            self.assertEqual(scan_module.wait_for_scan(self.digest, attempts=3), self.scan)
+            self.assertEqual(pause.call_count, 2)
+        with patch.object(scan_module, "aws", return_value=None), patch.object(scan_module.time, "sleep"):
+            with self.assertRaises(RuntimeError):
+                scan_module.wait_for_scan(self.digest, attempts=2)
+
+    def test_actions_tee_pipelines_use_bash_pipefail(self):
+        root = Path(__file__).parents[2]
+        for name in ("dev-deploy.yml", "dev-image.yml", "dev-verify.yml"):
+            workflow = (root / ".github/workflows" / name).read_text()
+            self.assertIn("defaults:\n  run:\n    shell: bash", workflow)
+
+
+class RevisionHistoryTests(unittest.TestCase):
+    def test_retains_only_actual_bootstrap_history_not_every_release(self):
+        old, current = "sha256:" + "a" * 64, "sha256:" + "b" * 64
+        state = {"resources": [
+            {"module": revision_module.MODULE, "type": "aws_ecs_task_definition", "name": "web", "instances": [{"index_key": old}, {"index_key": current}]},
+            {"module": revision_module.MODULE, "type": "aws_ecs_task_definition", "name": "job", "instances": [{"index_key": old + "/bootstrap"}, {"index_key": current + "/migrate"}, {"index_key": current + "/verify"}]},
+        ]}
+        self.assertEqual(revision_module.revision_inputs(state), {"retained_image_digests": [old, current], "retained_bootstrap_image_digests": [old]})
+        state["resources"][1]["instances"].append({"index_key": "latest/bootstrap"})
+        with self.assertRaises(ValueError):
+            revision_module.revision_inputs(state)

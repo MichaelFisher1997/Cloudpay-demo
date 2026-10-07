@@ -62,6 +62,9 @@ RDS-managed master-secret creation/tagging is initially restricted to RDS forwar
   Publication and jobs/service deployment require the exact digest's completed ECR
   OS scan with zero critical/high findings. App dependency advisories are checked
   separately; neither scan is a blanket security certification.
+  DEV workflows explicitly select Bash (`-eo pipefail`), so a failed auditor/scan
+  cannot be masked by `tee`. Scan startup's not-yet-created metadata is retried
+  within a bounded wait, never accepted as a clean result.
 - Private bootstrap/migration/DB-verification jobs run via Actions with no public
   task IP. Service activation re-verifies the DB before apply, then exercises real
   HTTP auth/ownership and direct S3 POST/CORS/checksum/size/download/deletion.
@@ -80,6 +83,9 @@ Terraform remains the task-definition/service owner. Actions retains prior image
 digests from state and creates new digest-keyed definitions without deleting old
 revisions. Changes to existing immutable definitions still fail closed under the
 no-deletion guard; `skip_destroy` is not used to bypass that guard.
+Initialization-definition history is tracked separately from ordinary image
+history. A subsequent/repeated release retains only bootstrap definitions that
+actually exist; it must not create fresh bootstrap revisions after retirement.
 
 | Work | Authentication and authority |
 | --- | --- |

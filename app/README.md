@@ -25,6 +25,11 @@ docker build --platform linux/amd64 -t godiffy:local .
 
 ## Environment / operator contract
 
+The Docker base additionally pins Alpine's published security fixes
+`libcrypto3/libssl3=3.5.8-r0` and `zlib=1.3.2-r1` in a shared build/runtime base.
+An unpatched Alpine candidate was also rejected (2 critical/8 high findings).
+Runtime still performs no package installs and keeps the non-root/read-only contract.
+
 Runtime: **required** `ENVIRONMENT=dev|prod`, `AWS_REGION`, `IMAGE_BUCKET`, `DATABASE_HOST`, `DATABASE_SECRET_ARN`, `APP_URL` (exact public origin). Defaults: `DATABASE_PORT=5432`, `DATABASE_NAME=godiffy`, `INVITED_EMAILS=` (empty disables registration). `APP_URL` must be HTTPS in `prod`, and `ALLOW_INSECURE_HTTP=true` is rejected outright in `prod` even if the URL is HTTPS. HTTP is allowed **only** with both `ENVIRONMENT=dev` and `ALLOW_INSECURE_HTTP=true`; this dev ALB-origin bootstrap is a draft decision. `NODE_ENV=production` remains the build/runtime framework setting; it does not override `ENVIRONMENT`. `DATABASE_URL` is local-only (localhost and `ENVIRONMENT=dev`, rejected with `NODE_ENV=production`); local auth additionally requires ephemeral `LOCAL_AUTH_SECRET` >=32 characters. Runtime secret JSON `{username,password,auth_secret}` is fetched by standard AWS task credentials on first DB use; pool max 5. An idle pool failure emits only a generic log line, never a pg error object. The public RDS global CA bundle is fetched at **image build**, baked into the image, and used for TLS certificate and hostname verification. Rebuild for CA refresh. Credentials are cached per process; after manual rotation restart tasks/job pools. **No automatic rotation is claimed.**
 
 One-off `db:bootstrap`: `AWS_REGION`, `DATABASE_HOST`, optional DB port/name, `MASTER_SECRET_ARN`, `DATABASE_SECRET_ARN`, `MIGRATION_SECRET_ARN`. It reads RDS-managed master JSON username/password, creates fixed NO-CREATEDB/NO-CREATEROLE roles `godiffy_schema` and `godiffy_runtime`, owns the `godiffy` schema, grants only runtime DML and search path, and writes generated role credentials plus auth signing secret directly to two pre-created Secrets Manager containers. PostgreSQL 16+ CREATEROLE-created membership defaults to `SET FALSE`; bootstrap grants `SET TRUE` on **only** `godiffy_schema` to the current master so schema ownership transfer works, never to runtime. Advisory lock serializes concurrent bootstrap jobs. Re-running reuses secret values without rotating. Dedicated bootstrap role must read master and read/write only app/migration secret containers. PostgreSQL default PUBLIC CONNECT on other databases remains untouched; isolate RDS instance/database if this matters.
@@ -41,4 +46,24 @@ Mutations require exact `Origin: APP_URL`; auth and image endpoints reject cross
 
 ## Verification and known limits
 
-Verified: `bun install --frozen-lockfile`, `bun run format:check`, `bun run typecheck`, `bun run build` pass; `bun audit` **0 advisories / 216 packages**. Pinned `vite@8.3.3` and `@vitejs/plugin-react@6.1.2` satisfy TanStack Start and Nitro 3 beta peer/compatibility metadata; the Vite 7 unsupported-builder and pg circular-chunk warnings are gone. All direct dependencies are exactly pinned in `package.json`, and `bun.lock` is frozen. `bun run test`: 13 pass/1 integration skip without DB; `bun run test:built`: PG17 integration plus built HTTP auth/DB smoke 1 pass/49 assertions using a **NOSUPERUSER CREATEROLE CREATEDB database-owner** master; `docker build --platform linux/amd64 -t godiffy:final .`: pass. Built container with `--read-only --user 10001:10001` returns HTTP 200 at `/`, `/health/live`, `/health/ready`; production HTTP bootstrap container exits 1 before listening. The PG17 suite uses real bootstrap SQL, schema migration (twice, plus parallel attempts), runtime privilege checks, Better Auth signup/login/session and persisted limiter, owner-filtered S3 lifecycle with fake storage, competing claims, tombstone retry, checksum rejection, and delete/finalize race. A separate local-only presigned-POST test decodes the policy to verify the fixed key, MIME, checksum, byte range, and expiration. Vite 8/Rolldown still warns that TanStack Router's `use client` module directives may not be preserved by bundling; the HTTP smoke exercises this app's SSR/auth routes but is not a general RSC validation. Nitro remains a beta. This simulated master is **not** an actual RDS `rds_superuser` and cannot establish its exact grant behavior. No actual Secrets Manager, RDS, ALB, S3 POST/CORS, AWS IAM, or RDS managed-master permission test has been run; those remain staging review gates. Better Auth 1.7.x schema validator currently warns that its own generated `rateLimit.lastRequest` bigint differs from expected `number` despite functional PG17 behavior; monitor upstream before rollout.
+- Frozen install, formatting, strict types and production build pass. Current
+  credential-free CI runs **15 unit tests** (one integration skip without DB),
+  built-server/local PostgreSQL integration with **49 assertions**, dependency
+  audit (**0 advisories / 216 packages**) and non-root/read-only amd64 image smoke.
+- Local PG17 uses a non-superuser database-owner/CREATEROLE master. It covers
+  repeated/concurrent migration, runtime grants, auth/session/limiter persistence,
+  fake-storage ownership, checksum rejection, claims and delete/finalize races.
+  Presigned-policy tests check key, MIME, checksum, byte range and expiration.
+  Those mocks are not real S3 or AWS RDS-master proof.
+- Actual Actions private jobs subsequently exercised RDS-managed initialization,
+  Secrets Manager writes, validated RDS TLS, plaintext rejection and runtime
+  SQL/master/migration-secret restrictions. Real HTTP/S3 and recovery evidence is
+  tracked in the deployment handoff rather than inferred from local tests.
+- All direct dependencies remain pinned and the lockfile frozen. Nitro is still a
+  beta; Vite/Rolldown emits TanStack `use client` module-directive warnings. Better
+  Auth's schema validator warns that its own generated `rateLimit.lastRequest`
+  bigint differs from expected `number`, despite tested PostgreSQL functionality.
+  Neither warning is a production certification; monitor upstream before promotion.
+- No production HTTPS/invitation, full-image decoding/malware scanning, interactive
+  browser, load/restore or regional failover proof is claimed. Process probes and
+  OS/dependency scans have intentionally bounded scope.

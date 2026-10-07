@@ -66,12 +66,13 @@ variable "invited_emails" {
 }
 variable "release" {
   type = object({
-    image_digest           = optional(string)
-    retained_image_digests = optional(set(string), [])
-    bootstrap_enabled      = optional(bool, false)
-    bootstrap_retained     = optional(bool, false)
-    service_enabled        = optional(bool, false)
-    database_ready         = optional(bool, false)
+    image_digest                     = optional(string)
+    retained_image_digests           = optional(set(string), [])
+    retained_bootstrap_image_digests = optional(set(string), [])
+    bootstrap_enabled                = optional(bool, false)
+    bootstrap_retained               = optional(bool, false)
+    service_enabled                  = optional(bool, false)
+    database_ready                   = optional(bool, false)
   })
   default = {}
   validation {
@@ -84,6 +85,12 @@ variable "release" {
   validation {
     condition     = alltrue([for digest in var.release.retained_image_digests : can(regex("^sha256:[a-f0-9]{64}$", digest))])
     error_message = "Retained revisions require actual immutable image digests."
+  }
+  validation {
+    condition = alltrue([for digest in var.release.retained_bootstrap_image_digests :
+      can(regex("^sha256:[a-f0-9]{64}$", digest)) && (contains(var.release.retained_image_digests, digest) || digest == var.release.image_digest)
+    ])
+    error_message = "Retain only known immutable bootstrap definitions from the reviewed release history."
   }
   validation {
     condition = (

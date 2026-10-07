@@ -1,6 +1,6 @@
 # London cost worksheet — 7 October 2026
 
-DEV foundations are being deployed through Actions; actual inventory/status is in
+DEV is deployed through Actions; actual inventory/status is in
 [dev-deployment.md](dev-deployment.md). The retained state bucket is normally well
 below $1/month for small state files/requests. Figures below estimate the approved
 small DEV design, not a measured bill or spending cap. USD, 730 hours/month, on-demand, no
@@ -19,10 +19,19 @@ taxes, discounts, credits or free tiers assumed.
 | **Illustrative** average 10 GB retained ECR images: $0.10/GB-month | $1.00 | $1.00 |
 | **Illustrative subtotal, not a ceiling or exact forecast** | **$93.63** | **$185.77** |
 
-The full foundations themselves incur ALB, RDS and endpoint charges before any
-service is activated. Do not assume "no ECS task" means "no bill". The illustration
-includes a running app, one sustained LCU and retained ECR volume, none of which
-is established by an empty foundation deployment.
+The actual one-task design's always-on subtotal is approximately **$86.50/month**
+before LCU usage, image/object storage, requests, logs, alarms and transfer. Nine
+explicit standard alarms plus two target-tracking alarms add approximately **$1.10/month**.
+The table's $93.63 illustration additionally assumes one continuously used LCU and
+10 GB retained ECR; it is not measured traffic. Use **$100–170/month** as the small
+DEV planning envelope, not a hard cap. A second steady task would add $10.36/month;
+the configured ceiling is two, and releases briefly overlap tasks.
+
+The foundations incurred ALB/RDS/endpoint charges before task activation. Current
+RDS is in `eu-west-2b`, whereas task/endpoints are in `eu-west-2a`, so database traffic
+is cross-AZ and usage-dependent. No NAT, public task IP, WAF, CloudFront, Redis,
+additional RDS or always-on job was added. Single-AZ placement is intentional; there
+was no destructive relocation to improve the illustration.
 
 Two extra continuous prod tasks add $20.72/month, giving an illustrative four-task
 subtotal **$206.50**. Each additional sustained LCU adds $6.13/month. Task rolling
@@ -47,7 +56,7 @@ or processing charge. Cross-AZ traffic can add charges if paths cross AZs.
 
 ## Usage-dependent costs and uncertainty
 
-- S3 images, **all retained versions**, requests and internet downloads; ALB access logs.
+- S3 images, **all retained versions**, requests and internet downloads; production-only ALB access logs (DEV access logging is disabled).
 - CloudWatch Logs ingestion $0.5985/GB and retained storage $0.0315/GB-month;
   short retention does not limit how much is ingested each month.
 - Standard CloudWatch alarm charges, SNS notifications and Secrets Manager API
@@ -60,7 +69,7 @@ or processing charge. Cross-AZ traffic can add charges if paths cross AZs.
 
 The earlier **$100–170/month dev / $220–380/month production** envelopes provide
 unquantified headroom; they are not traffic-derived forecasts or guaranteed caps.
-Confirm a budget, notification recipient and burn-rate expectations before apply.
+Confirm a notification recipient and measured burn-rate expectations before production.
 An AWS Budget is advisory, not a technical hard spending cap; none has been created.
 
 ## Reproducible official sources

@@ -27,7 +27,7 @@ locals {
       for digest in local.release_digests : [
         for kind, settings in local.job_types : {
           key = "${digest}/${kind}", kind = kind, image = local.release_images[digest], role_arn = settings.role_arn
-        } if kind != "bootstrap" || var.release.bootstrap_enabled || contains(var.release.retained_image_digests, digest)
+        } if kind != "bootstrap" || (var.release.bootstrap_enabled && digest == var.release.image_digest) || contains(var.release.retained_bootstrap_image_digests, digest)
       ]
     ]) : job.key => job
   }

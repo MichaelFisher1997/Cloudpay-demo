@@ -109,9 +109,16 @@ def main(outputs, replace):
     controls = aws("s3api", "get-public-access-block", "--bucket", bucket)["PublicAccessBlockConfiguration"]
     require(all(controls.values()), "Public image bucket")
     require(aws("s3api", "get-bucket-versioning", "--bucket", bucket)["Status"] == "Enabled", "Unversioned bucket")
+    ownership = aws("s3api", "get-bucket-ownership-controls", "--bucket", bucket)["OwnershipControls"]["Rules"]
+    require(len(ownership) == 1 and ownership[0]["ObjectOwnership"] == "BucketOwnerEnforced", "S3 ACL ownership not disabled")
+    encryption = aws("s3api", "get-bucket-encryption", "--bucket", bucket)["ServerSideEncryptionConfiguration"]["Rules"]
+    require(len(encryption) == 1 and encryption[0]["ApplyServerSideEncryptionByDefault"]["SSEAlgorithm"] == "AES256", "Wrong image encryption")
+    policy = json.loads(aws("s3api", "get-bucket-policy", "--bucket", bucket)["Policy"])
+    tls_denials = [statement for statement in policy["Statement"] if statement.get("Effect") == "Deny" and statement.get("Condition", {}).get("Bool", {}).get("aws:SecureTransport") == "false"]
+    require(len(tls_denials) == 1 and tls_denials[0]["Resource"] == [f"arn:aws:s3:::{bucket}", f"arn:aws:s3:::{bucket}/*"], "Missing exact image-bucket TLS denial")
     cors = aws("s3api", "get-bucket-cors", "--bucket", bucket)["CORSRules"]
     require(len(cors) == 1 and cors[0]["AllowedOrigins"] == [d["application_origin"]], "Wrong browser origin")
-    results["private_versioned_exact_origin_bucket"] = "pass"
+    results["private_versioned_encrypted_acl_disabled_tls_exact_origin_bucket"] = "pass"
 
     groups = aws("logs", "describe-log-groups", "--log-group-name-prefix", "/ecs/godiffy-dev-application")["logGroups"]
     require(len(groups) == 1 and groups[0]["retentionInDays"] == 7, "Wrong app log retention")

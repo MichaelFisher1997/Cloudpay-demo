@@ -8,6 +8,9 @@ on:
         description: Stop only the single DEV web task and verify recovery with saved sessions
 permissions:
   contents: read
+defaults:
+  run:
+    shell: bash
 concurrency:
   group: godiffy-dev-deployment
   cancel-in-progress: false

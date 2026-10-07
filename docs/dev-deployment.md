@@ -86,6 +86,18 @@ The apply was deferred after the published Debian image's ECR OS scan reported
 Alpine image built and passed non-root/read-only/production fail-closed checks locally.
 Image publication and jobs/service deployment now require a completed ECR OS scan
 with no critical/high findings; a fresh scanned release will be reviewed before apply.
+The first Alpine candidate `sha256:b50a6546ba878013d76bdeba99887855233ce2643f3049e2b21bfc09869f2c5d`
+was published but **not deployed**: ECR found 2 critical/8 high/1 medium issues in
+OpenSSL 3.5.7 and zlib 1.3.2-r0. The scan's initial `ScanNotFoundException` also
+exposed a `tee` exit-status masking bug: all DEV workflows now explicitly select
+Bash with `pipefail`, and scan creation/completion has a bounded wait. The final
+candidate pins Alpine's published fixes `libcrypto3/libssl3=3.5.8-r0` and
+`zlib=1.3.2-r1` in both build/runtime stages; it must pass the actual ECR gate.
+Release-history review also caught a repeat-plan edge case: ordinary retained image
+digests could inadvertently create a fresh, already-retired bootstrap definition.
+Actions now reads actual task-definition keys in memory and retains initialization
+digests separately. Mock/Python regressions cover repeat plans and refuse malformed
+history; this never grants new bootstrap privileges or bypasses deletion guards.
 
 The implementation and status/runbooks were committed and pushed to `master` in
 `7809dabb87812ae9da125003a5d7d8df826c9bc9`. GitHub

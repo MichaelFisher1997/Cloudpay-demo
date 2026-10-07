@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import time
 
 ACCOUNT = "218549829565"
 REGION = "eu-west-2"
@@ -26,11 +27,27 @@ def audit_scan(scan, digest):
     return result
 
 
-def aws(*args):
-    result = subprocess.run(["aws", "--region", REGION, "--no-cli-pager", *args, "--output", "json"], capture_output=True, text=True, timeout=660)
+def aws(*args, pending_scan=False):
+    result = subprocess.run(["aws", "--region", REGION, "--no-cli-pager", "--cli-connect-timeout", "10", "--cli-read-timeout", "60", *args, "--output", "json"], capture_output=True, text=True, timeout=180)
     if result.returncode:
-        raise RuntimeError("DEV image scan operation failed")
+        match = re.search(r"\(([A-Za-z0-9]+)\) when calling", result.stderr)
+        code = match.group(1) if match else "CLI_FAILURE"
+        if pending_scan and code == "ScanNotFoundException":
+            return None
+        raise RuntimeError(f"DEV image scan operation failed: {code}")
     return json.loads(result.stdout) if result.stdout.strip() else {}
+
+
+def wait_for_scan(digest, attempts=60):
+    if not re.fullmatch(r"sha256:[a-f0-9]{64}", digest):
+        raise ValueError("Expected immutable digest")
+    for attempt in range(attempts):
+        scan = aws("ecr", "describe-image-scan-findings", "--repository-name", REPOSITORY, "--image-id", f"imageDigest={digest}", pending_scan=True)
+        if scan and scan.get("imageScanStatus", {}).get("status") not in ("IN_PROGRESS", "PENDING"):
+            return scan
+        if attempt < attempts - 1:
+            time.sleep(5)
+    raise RuntimeError("Exact DEV image scan did not complete within the bounded wait")
 
 
 if __name__ == "__main__":
@@ -42,6 +59,5 @@ if __name__ == "__main__":
     identity = aws("sts", "get-caller-identity")
     if identity["Account"] != ACCOUNT or ":assumed-role/cloudpay-demo-github-actions/" not in identity["Arn"]:
         raise RuntimeError("Image verification must use the DEV Actions identity")
-    aws("ecr", "wait", "image-scan-complete", "--repository-name", REPOSITORY, "--image-id", f"imageDigest={digest}")
-    scan = aws("ecr", "describe-image-scan-findings", "--repository-name", REPOSITORY, "--image-id", f"imageDigest={digest}")
+    scan = wait_for_scan(digest)
     print(json.dumps(audit_scan(scan, digest)))

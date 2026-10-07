@@ -8,24 +8,25 @@ operability, and defensible trade-offs**, not application complexity.
 
 - **Deployed and verified:** dedicated Godiffy S3 Terraform backend, native state
   locking, versioning, encryption, and six bootstrap resources. Local backups retained.
-- **Built, not deployed:** Bun/TanStack application, PostgreSQL bootstrap/migration
-  jobs, Docker image, dev/prod Terraform, validation CI, and runbooks.
-- **Saved plans, not applied:** dev foundations **72 additions**; production
-  foundations **76 additions**. Both have **zero changes and zero deletions**.
+- **DEV is running:** [HTTP ALB URL](http://godiffy-dev-alb-1345285825.eu-west-2.elb.amazonaws.com).
+  Private database bootstrap, migration and runtime TLS/privilege jobs passed.
+  Final release/security/smoke evidence is in [the deployment handoff](docs/dev-deployment.md).
+- **Production remains undeployed:** its historical 76-addition foundation plan
+  is design evidence, not authorization or a current apply input.
 - No Portyard application infrastructure, production application resources or DNS
   records were changed.
 - **DEV-only Actions rollout authorized:** SSO has been renewed. Nine exact DEV
   policies (five CI scopes and four task boundaries) were human-bootstrapped onto
   the deliberately reused OIDC role; its trust/profile are unchanged. Application
-  deployment will use the new manual plan/apply/image Actions workflows only.
+  deployment uses manual plan/apply/image Actions workflows only.
   See [dev deployment status](docs/dev-deployment.md).
 - Plans/state/dependencies and all credentials are excluded from Git.
-- **GitHub validation passed:** [run 37607324492](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37607324492)
+- **GitHub validation passed:** [run 37687056441](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37687056441)
   tests/builds the actual committed implementation without AWS credentials.
 
-DEV-only autonomous deployment is now authorized within the agreed architecture
-and safety limits. Application resources are not yet deployed. Production
-and domain/TLS work remain unauthorized. This is not a claim of a running AWS app.
+DEV is intentionally HTTP-only: use disposable passwords and non-sensitive images.
+Production and domain/TLS work remain unauthorized. Do not interpret process-only
+health probes, local mocks or a scan as proof of production readiness.
 
 ## Design in brief
 
@@ -43,7 +44,7 @@ flowchart LR
 Dev intentionally has one task, Single-AZ RDS, and one endpoint AZ. Production is
 designed for two task AZs, two minimum replicas, Multi-AZ RDS, and endpoints in both
 AZs. There are no NAT gateways, public task IPs, Redis, Kubernetes, or external
-runtime SaaS dependencies in the draft.
+runtime SaaS dependencies in DEV.
 
 ## Review and operate
 
@@ -56,6 +57,7 @@ runtime SaaS dependencies in the draft.
 | [Costs](docs/costs.md) | Official London prices, assumptions and endpoint/NAT comparison |
 | [Operations](docs/operations.md) | Staged deployment, verification, rollback, recovery and TLS last |
 | [Delivery security](docs/delivery.md) | Actions-only DEV rollout, IAM limits and separate production approvals |
+| [DEV teardown](docs/teardown.md) | Exact retirement scope, data/protection safeguards and separate approval |
 | [State backend](docs/terraform-state.md) | Live backend, migration record, locking and access controls |
 | [Application](app/README.md) | Runtime/job contracts, local tests and known security limits |
 | [OIDC bootstrap](docs/aws-oidc.md) | Original identity bootstrap; DEV delivery scope is recorded separately |
@@ -83,5 +85,5 @@ container with ephemeral credentials and mocked AWS services, then stops only it
 own container. Docker build context is `app/`.
 
 Production registration is intentionally disabled: a dev email allowlist is not
-proof of inbox ownership. Actual AWS image pulls, RDS master permissions, S3
-POST/CORS and ALB behavior require an approved staging rollout.
+proof of inbox ownership. Actual AWS image-pull, database, S3 and ALB verification
+is recorded separately from local tests in the deployment handoff.
