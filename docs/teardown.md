@@ -44,7 +44,8 @@ published in logs or ordinary Actions artifacts.
   Keep `skip_final_snapshot=false`, `delete_automated_backups=false` and record the
   final snapshot name `godiffy-dev-final-<that-suffix>`.
 - In an explicit retirement-only code change, remove `prevent_destroy` from the
-  DEV DB instance, image bucket, runtime/migration secret containers and smoke secret; disable DEV DB deletion protection
+  DEV DB instance, image bucket, runtime/migration secret containers and smoke secret;
+  disable DEV DB deletion protection
   with a reviewed non-destructive Actions apply **before** the destroy plan.
   Do not weaken production protections. Do not change final-snapshot requirements.
 - Inventory **all versions and delete markers** in
@@ -77,15 +78,21 @@ the saved plan contains only the approved application slice and no backend, CI
 policy/provider/role, production or unrelated deletions. The normal deployment
 auditor rejects every deletion and must not be bypassed for regular releases;
 retirement needs its own explicit destructive-plan review/approval. Apply only
-that reviewed plan in Actions. Retained nonempty buckets/ECR must be deliberately
+that reviewed plan in Actions:
+
+```sh
+terraform -chdir=terraform/environments/dev apply -input=false -no-color dev-retirement.tfplan
+```
+
+Retained nonempty buckets/ECR must be deliberately
 excluded or migrated to an approved retained-resource configuration, never forced away.
 
 ## 4. Retire the CI grants last and verify retained costs
 
 After application retirement, separately review removal of the five
 `godiffy-dev-ci-{network,data,services,control,iam}` attachments from the reused OIDC
-role and deletion of the nine dedicated policies (five CI scopes/four boundaries), once no task role
-uses a boundary. This needs removal of their DEV `prevent_destroy` protection and
+role and deletion of the nine dedicated policies (five CI scopes/four boundaries),
+once no task role uses a boundary. This needs removal of their DEV `prevent_destroy` protection and
 an approved IAM retirement step/identity that does not revoke itself mid-operation.
 The original role/provider/trust remain identity-only afterward. Remove the temporary
 teardown grant last. Reconcile DEV state with the deliberately retained inventory.

@@ -27,6 +27,12 @@ The table's $93.63 illustration additionally assumes one continuously used LCU a
 DEV planning envelope, not a hard cap. A second steady task would add $10.36/month;
 the configured ceiling is two, and releases briefly overlap tasks.
 
+ECR currently retains three immutable images: final patched **95,518,792 bytes**,
+rejected Alpine **92,970,250 bytes** and original Debian **144,561,048 bytes**
+(reported compressed image sizes, not deduplicated billed storage). This is far
+below the worksheet's illustrative 10 GB; the rejected images were not deleted
+under deployment approval and severe-findings digests cannot pass the release gate.
+
 The foundations incurred ALB/RDS/endpoint charges before task activation. Current
 RDS is in `eu-west-2b`, whereas task/endpoints are in `eu-west-2a`, so database traffic
 is cross-AZ and usage-dependent. No NAT, public task IP, WAF, CloudFront, Redis,

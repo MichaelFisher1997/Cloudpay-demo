@@ -1,197 +1,187 @@
-# DEV deployment status — 7 October 2026
+# DEV deployment handoff — 7 October 2026
 
-## Outcome: private jobs passed; service running; guarded status-read retry next
+## Outcome: interview demo deployed; real HTTP/S3 smoke passed; Terraform converged
 
-The user approved autonomous **DEV-only** deployment in account `218549829565`,
-region `eu-west-2`, using the existing `portyard` SSO profile and
-`PortyardAdministrator` human role. Production, Cloudflare/Route 53, ACM, custom
-domains, permanent keys and broad CI permissions remain forbidden.
+**URL:** http://godiffy-dev-alb-1345285825.eu-west-2.elb.amazonaws.com
 
-The earlier AWS identity preflight could not authenticate. The cached SSO access token
-expired at **2026-10-07 00:34:12 UTC**; refresh returned HTTP 400
-`invalid_grant` at approximately **10:19 UTC**. A desktop browser is not connected,
-so this session cannot complete a normal interactive SSO login on the user's behalf.
-The profile, role and AWS account configuration were not changed. The user has
-since renewed the existing session; exact account/human SSO identity verification
-now succeeds.
+The UI and `/health/live` / `/health/ready` returned HTTP 200. Real authentication,
+database-backed sessions/rate limiting and private S3 integration **passed** in Actions.
+The final release applied **8 additions, 1 in-place update, 0 deletions**, followed
+by a refreshed **zero-change plan**. Process probes alone are not DB-health proof.
+Use only disposable passwords and non-sensitive images: DEV is intentionally HTTP.
 
-**Deployment must run from GitHub Actions**, per the user's latest direction.
-Human SSO is used only for read-only checks and bootstrap of the exact DEV CI
-permissions/task boundaries. No local Terraform application apply, ECR push,
-database job or ECS rollout is permitted. The user separately approved creation
-of exactly the missing AWS-managed RDS and ECS autoscaling service-linked roles
-by Actions; existing ECS/ELB service-linked roles remain unchanged.
+Account **218549829565**, region **eu-west-2**, environment **dev**.
 
-The delivery workflows enforce master-only OIDC, DEV state/account/region,
-immutable digests, explicit plan-review fingerprints, no Terraform deletions or
-replacements, and no CI edits to its own permissions or task boundaries. Bootstrap
-retirement restricts its trust/policy in place while retaining the role and task
-definition. Real private DB verification and HTTP/S3 smoke scripts are prepared;
-they have not yet run against AWS.
+- Running image: `218549829565.dkr.ecr.eu-west-2.amazonaws.com/godiffy-dev-application@sha256:52f132c7cb0264b64da5a6e6075757984c456a17f73e9b13b52bedb6b2852587`.
+- Immutable tag: `a627234812426dec69faa1f970f5bb43cb821456`.
+- Web definition: `arn:aws:ecs:eu-west-2:218549829565:task-definition/godiffy-dev-web:2`.
+- Completed ECR OS scan: **no reported findings**. Dependency audit: zero advisories.
+- Original Debian and rejected Alpine images are retained, not safe rollback candidates.
 
-Nine exact DEV IAM policies and five attachments were human-bootstrapped without
-trust/profile changes or alternate credentials. Commit `b994283` enabled guarded
-Actions-only delivery. Credential-free [validation run 37619760584](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37619760584)
-passed. [Foundation plan 37619787401](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37619787401)
-passed review: **73 additions, 14 exact CI imports, 0 changes, 0 deletions**.
+Application applies, images, DB jobs and ECS releases run **only in GitHub Actions**.
+The preserved `portyard` / `PortyardAdministrator` SSO identity is used only for
+read-only inspection and exact DEV IAM bootstrap. No Portyard infrastructure,
+production, DNS, ACM, Cloudflare/Route 53, IAM users or permanent keys were changed.
 
-[Apply 37620104649](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37620104649)
-matched its reviewed fingerprint but stopped on log tag-read ARN spelling,
-security-rule/endpoint attachment IAM checks and invalid wildcard SNS topic actions.
-The partial DEV VPC/subnets/routes/security groups, private versioned image bucket,
-three empty secret containers, DB parameter/subnet groups and alarm topic are retained.
-No image, database job or web service has run yet. The retry adds only exact DEV
-permissions and valid SNS topic actions. One failed-new empty DB log group is
-tainted; an explicitly selected Actions repair verifies recent creation, ownership
-and no streams/data before retaining it with `untaint`, not replacing/deleting it.
+## Actual final inventory
 
-The next apply created the remaining network, RDS and ALB but stopped on an
-unfiltered provider RDS metadata read. An exact account/region read-only permission
-fixed that path. The failed-new DB was verified available, recent, correctly tagged,
-with no application credentials, jobs or tasks, then retained by Actions `untaint`.
-Both repairs kept the physical resources; neither deleted data or infrastructure.
+DEV state contains **102 managed records: 88 new DEV records and 14 exact imported
+CI policies/attachments**; no taints remain. The independent backend has six records.
+Final state inspected at serial **16**, after the successful release. Raw state and plans
+remain private/owner-only, not committed or published as ordinary artifacts.
 
-[Foundation apply 37630947179](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37630947179)
-completed its last **8 additions, 0 changes, 0 deletions** and confirmed **no changes**
-on a refreshed plan. The complete foundation is **73 new DEV records plus 14 exact
-CI imports**. [Image publication 37628283144](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37628283144)
-built/smoke-tested amd64 and pushed immutable tag `1c0b0f698fb4b1e31d5ee99916a3b894f7f24f07`,
-digest `sha256:44c6c7efdd7feb4b688bea19c1c158f6efcea49accb213b31c5426e0bd44dfa3`.
-The jobs [plan 37631037555](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37631037555)
-passed scope review: **6 additions, 0 changes, 0 deletions**.
-[Jobs apply 37633228998](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37633228998)
-created those six records, ran bootstrap/migration/runtime verification privately
-with **exit 0** for each and confirmed a zero-change plan. Verification exercised
-validated TLS, rejected plaintext and restricted SQL/master/migration-secret access.
-Human retirement set the bootstrap boundary to explicit secret denials and removed
-CI bootstrap `PassRole`; Actions also denied the retained role's trust/inline policy.
+| Component | Actual inventory/status |
+| --- | --- |
+| Network | One dedicated `10.42.0.0/16` VPC; six subnets (public/task/database pairs in two AZs), one IGW, four managed route tables, six associations, one public default route; four dedicated SGs, five ingress/four egress rules |
+| Private AWS access | Four interface endpoints (`ecr.api`, `ecr.dkr`, `logs`, `secretsmanager`) in `eu-west-2a`; one S3 gateway; no NAT or public task IP |
+| ALB | `godiffy-dev-alb`, public in two AZs; one HTTP listener and `godiffy-dev-app` IP target group; service waiter and real HTTP/S3 smoke passed |
+| ECS | `godiffy-dev-cluster` / `godiffy-dev-web`; one desired private Fargate task, successful steady-state waiter; 0.25 vCPU / 0.5 GiB; non-root/read-only amd64 image |
+| Task definitions | Seven retained revisions: web/migrate/verify `:1` and `:2`, bootstrap `:1`; only final web `:2` is a service; no always-on jobs |
+| RDS | `godiffy-dev-postgres`, PostgreSQL **17.9**, private encrypted Single-AZ `db.t4g.micro` in `eu-west-2b`; 20 GiB gp3, maximum 50 GiB, seven-day backups, deletion protection; available, restore-time metadata present |
+| S3 | `godiffy-dev-images-218549829565-eu-west-2`; private, versioned, SSE-S3, ACL-disabled, TLS-enforced; eight bucket configuration records; exact ALB-origin CORS |
+| Secrets | Three Terraform-managed containers (runtime, migration, disposable smoke fixtures); one RDS-managed master secret outside Terraform value/state management; master status active |
+| Task IAM | Four `godiffy-dev-{execution,runtime,migration,bootstrap}` roles with four inline policies and role-specific human-controlled boundaries; bootstrap retained but denied |
+| CI IAM | Nine dedicated policies: five attached DEV CI scopes and four task boundaries; existing OIDC provider/role/trust reused unchanged |
+| Monitoring/scaling | Two seven-day log groups, **nine** explicit alarms, one `godiffy-dev-alarms` SNS topic/policy; one CPU target-tracking policy (60%) and scalable target bounded **1–2** tasks, with two AWS-managed tracking alarms |
+| Account service roles | Exactly the approved RDS and ECS autoscaling roles created at **13:01:58** / **21:46:59 UTC**, respectively. Existing ECS/ELB service roles preserved |
+| Backend | `godiffy-terraform-state-218549829565-eu-west-2`; protected SSE-S3/versioning/public-access/ownership/TLS/native-lock configuration; distinct bootstrap/dev/prod keys; backups retained |
 
-[Service apply 37636634654](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37636634654)
-created the service but its provider health waiter lacked `ecs:ListServiceDeployments`.
-AWS reports **one running task, completed rollout, no failed tasks**, while Terraform
-marked the service tainted. The user separately approved a guarded Actions-only
-retention repair after verifying exact tags, original creation, image, private network
-and healthy ALB target. Only failed-read state taint is cleared; deletion/replacement
-remains forbidden. The narrowly scoped deployment metadata reads were added.
-The repair first stopped unchanged when its six-hour freshness guard expired during
-the pause ([run 37686112370](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37686112370)).
-The user then explicitly approved pinning it to the original creation timestamp
-**2026-10-07 14:27:37.018 UTC**, rather than broadening the age window. All other
-identity/image/private-network/health guards remain required.
-[Repair/plan 37686483704](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37686483704)
-verified all guards, retained the original service and reviewed **5 additions, 0
-changes, 0 deletions** (three service alarms and autoscaling target/policy).
-The apply was deferred after the published Debian image's ECR OS scan reported
-**6 critical, 19 high, 12 medium, 6 low** findings. A same-version, digest-pinned
-Alpine image built and passed non-root/read-only/production fail-closed checks locally.
-Image publication and jobs/service deployment now require a completed ECR OS scan
-with no critical/high findings; a fresh scanned release will be reviewed before apply.
-The first Alpine candidate `sha256:b50a6546ba878013d76bdeba99887855233ce2643f3049e2b21bfc09869f2c5d`
-was published but **not deployed**: ECR found 2 critical/8 high/1 medium issues in
-OpenSSL 3.5.7 and zlib 1.3.2-r0. The scan's initial `ScanNotFoundException` also
-exposed a `tee` exit-status masking bug: all DEV workflows now explicitly select
-Bash with `pipefail`, and scan creation/completion has a bounded wait. The final
-candidate pins Alpine's published fixes `libcrypto3/libssl3=3.5.8-r0` and
-`zlib=1.3.2-r1` in both build/runtime stages; it must pass the actual ECR gate.
-Credential-free [validation 37689042734](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37689042734)
-passed code/tests but refused the package pin: the repository now offers OpenSSL
-**3.5.9-r0**, not the older 3.5.8 fix version listed by the security database. The
-actual signed package index was checked and the exact build/runtime pin corrected
-to 3.5.9-r0; no failing image was deployed.
-Release-history review also caught a repeat-plan edge case: ordinary retained image
-digests could inadvertently create a fresh, already-retired bootstrap definition.
-Actions now reads actual task-definition keys in memory and retains initialization
-digests separately. Mock/Python regressions cover repeat plans and refuse malformed
-history; this never grants new bootstrap privileges or bypasses deletion guards.
+Counts are Terraform configuration records, not 102 independent AWS services.
+AWS-created default SG/route table, ENIs, RDS secret, service roles and autoscaling
+alarms are not additional Terraform-managed records. All dedicated DEV resources
+use `godiffy-dev-*` names and the required project/environment/management/purpose tags.
 
-The implementation and status/runbooks were committed and pushed to `master` in
-`7809dabb87812ae9da125003a5d7d8df826c9bc9`. GitHub
-[validation run 37607324492](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37607324492)
-**passed**: 24 mocked Terraform runs, app formatting/types/13 unit tests,
-local PostgreSQL and actual built-server HTTP integration, dependency advisory
-check, amd64 Docker build, and read-only/non-root/production guard smoke. This
-workflow has no AWS credentials or deployment authority. No deployment workflow
-was run and no DEV OIDC IAM permissions could be configured without AWS access.
+## Actions evidence and plan counts
 
-For future session renewal, preserve the existing profile:
+| Evidence | Actual result |
+| --- | --- |
+| [Foundations plan 37619787401](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37619787401) | 73 additions and 14 exact CI imports; zero changes/deletions |
+| [Final foundation apply 37630947179](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37630947179) | Last eight additions completed; refreshed zero-change plan |
+| [Initial image 37628283144](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37628283144) | Immutable original amd64 digest published; subsequently found severe OS issues |
+| [Jobs apply 37633228998](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37633228998) | Six additions; bootstrap/migration/runtime verification each **exit 0**; convergence |
+| [Initial service apply 37636634654](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37636634654) | Created a healthy service; provider status-read permission failed, leaving a taint |
+| [Approved retention 37686483704](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37686483704) | Verified original creation/tags/image/private network/container and ALB health; cleared only the failed-read taint; remaining plan 5 add / 0 change / 0 delete |
+| [Validation 37690611200](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37690611200) | Patched build passed; 27 Terraform mock runs, 32 Python guard tests, 15 app tests/one DB skip, local PostgreSQL/built-server HTTP integration, types/format/advisories and container/production guards |
+| [Patched image 37690896101](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37690896101) | Immutable replacement published; completed exact-digest OS scan, no reported findings |
+| [Patched service plan 37691183692](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37691183692) | **8 add / 1 in-place change / 0 delete**; three new definitions, three alarms and scaling target/policy; no new bootstrap revision |
+| [Patched service apply 37691404457](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37691404457) | **8 added / 1 changed / 0 destroyed**; old/new runtime verifier jobs exited **0**; real HTTP/S3 smoke **PASS**; final refreshed plan **no changes** |
+
+Every apply uses a freshly generated saved plan with the reviewed semantic
+fingerprint. Ordinary Terraform deletion/replacement and CI self-IAM mutation remain
+fail-closed. Production is unapplied; its old 76-addition plan is historical design
+evidence, not a current apply input.
+
+Release-plan fingerprint:
+`e29efaf26ea1bb5b863bcf1cb8821b2315feac2f2bd0803262e423cdbec24cad`.
+
+## Tests, security boundaries and focused fixes
+
+**Passed in AWS:** RDS-managed bootstrap and direct application-secret writes,
+ordered migration, CA-validated RDS TLS, plaintext rejection, runtime SQL privilege
+restrictions and denial of master/migration secrets. Service activation reran the
+private runtime verifier before apply and with the final image afterward. Real
+HTTP smoke exercised allowed signup, denied outsider/wrong password, persisted
+login/sessions/rate limiting, anonymous gallery denial and cross-origin denial.
+Real S3 tests exercised exact-origin POST/GET preflight, fixed MIME/checksum/size
+policy, altered-policy/checksum/oversize rejection, private HEAD denial, other-user
+complete/download/delete/list isolation, verified finalization, identical download
+bytes, idempotent deletion and deleted version/URL denial. Only this invocation's
+test images were deleted; disposable accounts and pending upload versions remain.
+Initial `migrate:1` exited 0; `migrate:2` was registered but not executed because
+this packaging-only release had no schema change. Secret values did not pass
+through Terraform or get printed by the deployment/job/smoke scripts.
+
+**Passed without AWS deployment credentials:** 27 mocked Terraform runs, 33 Python
+guard tests, 15 application unit tests, local PostgreSQL integration (38 assertions),
+built-server HTTP integration (49 assertions), frozen dependency audit (zero
+advisories across 216 packages), strict types/format/build and non-root/read-only
+amd64 production-failure guards. Mocks are kept distinct from real AWS evidence.
+The deployed-code validation run contains 32 Python tests; the final exact-scaling
+permission regression raises the locally passing count to 33. Access Analyzer
+reported no findings for the final narrowed CI policy.
+
+Focused repairs preserved resources rather than replacing them:
+
+- CI log-tag ARN, EC2 endpoint/rule attachment, valid SNS actions and regional
+  RDS metadata reads were corrected. Failed-new empty log/uninitialized DB taints
+  were cleared only after the approved ownership/freshness/empty-state checks.
+- `ecs:ListServiceDeployments` / `ecs:DescribeServiceDeployments` are now limited
+  to the exact DEV service/deployment ARN. The running-service repair required
+  separate approval. Its six-hour guard first expired unchanged; the user then
+  approved pinning **2026-10-07 14:27:37.018 UTC**, not broadening the age window.
+- Bootstrap trust/inline policy deny use; its human-owned boundary explicitly
+  denies secret reads/writes and CI no longer has bootstrap `PassRole`. Actions
+  cannot restore those permissions or edit its own policies/boundaries.
+- After creation, human bootstrap pinned scaling writes to the actual ARN
+  `arn:aws:application-autoscaling:eu-west-2:218549829565:scalable-target/0ec5ce51b18de9d74bb1b5343ca6f527a47e`.
+  Only `godiffy-dev-ci-control` changed, to version **v5**; v1–v4 were preserved.
+  Bootstrap retirement and the original OIDC trust remained unchanged. Further
+  version changes must stop for review at IAM's five-version limit, not delete history.
+- ECR found **6 critical/19 high/12 medium/6 low** OS findings in the Debian image,
+  despite the clean app dependency audit. The unpatched Alpine candidate
+  `sha256:b50a6546ba878013d76bdeba99887855233ce2643f3049e2b21bfc09869f2c5d`
+  had **2 critical/8 high/1 medium** and was **not deployed**. Final packaging pins
+  Bun 1.4.2 Alpine plus OpenSSL **3.5.9-r0** and zlib **1.3.2-r1**. Publication and
+  jobs/service deployment now require a complete scan with zero critical/high findings.
+- A `tee` pipeline masked the first scan-startup failure. DEV workflows now
+  explicitly use Bash `pipefail`; scan creation/completion has a bounded wait.
+  The unavailable older OpenSSL fix pin failed credential-free CI, not deployment.
+- Release history retains actual bootstrap-definition digests separately, so a
+  repeated new release cannot create a fresh retired bootstrap revision. Recovery
+  waits for the exact replacement's container **and ALB** health before session reuse.
+
+## Remaining verification and deliberate limitations
+
+- The user clarified this is a simple Terraform interview demo. Work stops after
+  the working release, basic end-to-end proof, converged plan and handoff—not a
+  broader production-readiness project. The optional `dev-verify.yml` full inventory,
+  live CI-secret-denial/log-sampling/metric audit and task-replacement exercise were
+  **not run**. Recovery helpers are implemented/tested locally, not proven in AWS.
+- Interactive-browser testing is unavailable (desktop browser disconnected).
+  Protocol-level CORS preflight is not a claim of every browser behavior.
+- No production HTTPS/DNS/invitation-ownership, load/autoscaling stress, backup
+  restore, AZ/regional failover or malware/full-image-decoding proof is claimed.
+  RDS backup metadata is not a successful restore. Scans do not cover every static
+  library or prove absence of vulnerabilities.
+- Process-only health probes can remain healthy during DB failure. Better Auth
+  warns about its generated `rateLimit.lastRequest` bigint; Nitro is beta and
+  Vite/Rolldown emits module-directive warnings. Tested behavior does not erase
+  those upgrade/production-review risks.
+- No alert email recipient or AWS Budget was added without approval. SNS routing
+  exists, but an unconfirmed/unsubscribed topic is not human alert delivery.
+
+## Costs, production differences and retirement
+
+The one-task approved design is approximately **$86.50/month** in always-on fixed
+infrastructure before usage, alarms and ECR/object storage. The worksheet's
+one-LCU/10-GB-ECR illustration is **$93.63/month**; allow **$100–170/month**, not a
+measured bill or hard cap. Four one-AZ interface endpoints cost about $32.12/month;
+there is no NAT. RDS in `eu-west-2b` and tasks/endpoints in `eu-west-2a` incur
+usage-dependent cross-AZ traffic. A second steady task adds about $10.36/month;
+release overlap and retained versions/snapshots/logs also cost money. See [costs](costs.md).
+
+Production remains separate/unapplied: HTTPS and registration-review gates,
+two task/endpoint AZs, at least two tasks, Multi-AZ larger RDS, longer retention,
+access logs and confirmed notifications are design differences, not deployed claims.
+`godiffy.com` / `dev.godiffy.com` were not activated.
+
+**Teardown requires separate explicit approval.** The exact Actions-only retirement
+commands, final-snapshot/data-version/protection safeguards and CI grants removed
+last are in [teardown.md](teardown.md). Preserve backend/local backups, original
+OIDC/SSO identities, service-linked roles and every Portyard/production resource.
+No infrastructure destroy, resource replacement or routine cleanup was performed.
+
+To refresh the same deployed configuration without a local application apply:
 
 ```sh
-nix-shell --run 'aws sso login --profile portyard'
-nix-shell --run 'aws sts get-caller-identity --profile portyard --region eu-west-2'
+gh workflow run dev-deploy.yml --repo MichaelFisher1997/Cloudpay-demo --ref master \
+  -f phase=service -f operation=plan \
+  -f image_digest=sha256:52f132c7cb0264b64da5a6e6075757984c456a17f73e9b13b52bedb6b2852587
 ```
 
-Expected account: `218549829565`; expected human role: `PortyardAdministrator`.
-Do not send tokens/passwords in chat, replace the profile or create access keys.
-
-## Actual resources and verification (superseded as rollout progresses)
-
-| Required handoff item | Actual status |
-| --- | --- |
-| Deployed resources | Six approved backend records; **87 DEV state records** = 73 new foundations plus 14 exact CI policy/attachment imports |
-| Plan/apply counts | Foundations completed across focused retries, **0 deletions**; final refreshed plan **0 add / 0 change / 0 delete**; jobs plan **6 / 0 / 0** |
-| DEV ALB URL | `http://godiffy-dev-alb-1345285825.eu-west-2.elb.amazonaws.com`; listener exists but no service target yet, not a working website |
-| ECR tag/digest | Immutable commit `1c0b0f698fb4b1e31d5ee99916a3b894f7f24f07`; digest `sha256:44c6c7efdd7feb4b688bea19c1c158f6efcea49accb213b31c5426e0bd44dfa3`; published by Actions |
-| ECS service/tasks | Cluster exists; no service/task/job execution yet |
-| RDS | `godiffy-dev-postgres`, PostgreSQL 17.9, private encrypted Single-AZ `db.t4g.micro`, available with active RDS-managed master secret; TLS/SQL privileges not yet exercised |
-| S3 image tests | Only local mock/presigned-policy tests; real S3 POST/CORS/download/delete/private-access tests not performed |
-| Bootstrap/migration | Local PG17 and actual built-server HTTP tests pass; no AWS job run |
-| IAM task roles | Execution/runtime/migration roles created with exact role-specific human-controlled boundaries; bootstrap role planned, exact master ARN bound |
-| GitHub OIDC | Existing provider/trust unchanged; five exact DEV CI scopes and four immutable task boundaries human-bootstrapped |
-| GitHub validation | Latest run 37630526181 succeeded for `0f7573b`; no AWS credentials/deployment in validation |
-| Real AWS tests in this attempt | SSO/OIDC identity, CI policy validation/bootstrap and partial foundation apply; deployed app path not yet tested |
-| Earlier blocker | SSO expiry resolved by the user; intermittent AWS API read timeouts were handled by bounded, idempotent bootstrap retries |
-| Still unverified | Entire deployed DEV path, private ECR pull, RDS master privileges/TLS, real S3 semantics, ALB health, logs/metrics, alarms, task replacement and OIDC deployment |
-| DEV recurring cost | Partial foundations now incur small usage charges; full small-dev envelope **$100–170/month**, subject to usage |
-| Compromises | Planned one task/endpoint AZ and Single-AZ DB, HTTP/disposable test accounts, email-string allowlist, pinned Nitro beta, no regional DR |
-| Production | Undeployed; separate roots/plans and HTTPS/redundancy safeguards remain intact |
-| Domain/TLS work | Not performed; no ACM request or Cloudflare/Route 53 change |
-
-Previous bootstrap verification is recorded in [terraform-state.md](terraform-state.md);
-it was not repeated with expired credentials. Saved plans must be refreshed and
-scope-reviewed before apply, not assumed current because they exist locally.
-
-## Resume checklist
-
-- [x] Renew SSO; verify exact account and role.
-- [x] Amend bootstrap retirement to restriction without Terraform resource deletion.
-- [x] Validate and bootstrap exact DEV-only OIDC permissions and task boundaries.
-- [x] Commit/push Actions-only delivery workflows and offline/real-test safeguards.
-- [x] Re-plan DEV; reject all deletions/unrelated resources; apply reviewed foundations and confirm convergence.
-- [ ] Verify network, private endpoints/SGs, versioned private images, RDS and ECR.
-- [x] Commit/build a linux/amd64 image; publish immutable SHA tag and record digest.
-- [x] Plan/apply narrowly scoped private bootstrap/migration definitions and roles.
-- [x] Run/check job exit codes; test RDS TLS and runtime SQL privileges.
-- [x] Restrict bootstrap access in place, without deleting Terraform resources.
-- [ ] Retain verified healthy service after its failed status read using approved Actions repair.
-- [ ] Plan/apply one-replica HTTP DEV service, monitoring and scaling.
-- [ ] Test signup/login/session, DB, S3 POST/CORS/limits/download/delete and ownership.
-- [ ] Test bucket privacy, IAM denial, metrics/logs and basic task replacement.
-- [ ] Configure DEV-only OIDC delivery; execute validation and a safe actual release.
-- [ ] Confirm a converged DEV plan; record exact deployed inventory and evidence.
-- [ ] Update this document/architecture/interview notes; commit and push final results.
-
-## Teardown after the interview
-
-This approval **does not authorize a routine teardown**. Obtain explicit approval
-for the exact Godiffy DEV resource/data inventory before any destroy. Never destroy
-the bootstrap backend, production or unrelated resources.
-
-Partial DEV foundations already exist; do not abandon them as cost-free or run
-cleanup without approval. Use this sequence under fresh scoped approval:
-
-1. Disable DEV delivery so it cannot recreate resources. Back up the exact DEV
-   state securely and record image-version/database retention requirements.
-2. Review only `terraform/environments/dev`, its exact backend key and Godiffy names.
-   Stop on any non-DEV/unrelated resource in the proposed retirement plan.
-3. Choose a unique final DB snapshot suffix; explicitly review removal of DEV
-   `prevent_destroy`/deletion protection. Keep `skip_final_snapshot=false`.
-4. Retire the service/jobs and dedicated DEV resources using the exact reviewed
-   destroy plan, not broad AWS deletes or an unreviewed `terraform destroy`.
-5. Nonempty ECR and versioned image buckets intentionally refuse forced deletion.
-   Obtain separate exact-scope data-deletion approval before removing their images,
-   object versions or delete markers. Never set `force_destroy=true` for convenience.
-6. Verify the final snapshot and retained automated backups; document their ongoing
-   cost. Keep approved backend and local backups. Verify DEV state/resource inventory
-   is empty only when the deliberately retained data/resources are accounted for.
-
-No destructive command has been run as part of this handoff.
+Actions reconstructs both retained release digests from state, and retains only
+the original bootstrap digest. The live release has `bootstrap_enabled=false`,
+`bootstrap_retained=true`, `service_enabled=true`, `database_ready=true`, with
+`smoke-owner@godiffy.invalid`, `smoke-other@godiffy.invalid`, `interview@godiffy.invalid`
+as the disposable DEV allowlist. Do not apply the default foundations-only inputs
+against a live service or reuse an old saved plan.

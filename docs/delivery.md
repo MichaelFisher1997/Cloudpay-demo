@@ -127,12 +127,13 @@ cannot be claimed to have a functioning protected CI deployment path.
   evaluate a permissions boundary and tag/PassRole controls before authorizing CI
   to manage IAM. A prefix by itself is not a complete escalation defense.
 
-Nine dedicated DEV policies and five attachments were bootstrapped. Application
-resources are not yet deployed at this documentation checkpoint. No trust/provider
-or environment-setting change was made. Human SSO remains deliberately privileged; isolate and review commands, never
+Nine dedicated DEV policies and five attachments were bootstrapped. DEV application
+resources are deployed; the exact release and AWS verification are recorded in
+[dev-deployment.md](dev-deployment.md). No trust/provider or account-setting change
+was made. Human SSO remains deliberately privileged; isolate and review commands, never
 treat its profile name as permission to manage other applications.
 
-## Proposed release sequence
+## Release sequence and production promotion gates
 
 1. Validate code, dependency/image scans and local integration; build **one**
    linux/amd64 image tagged with a unique commit/release identifier.

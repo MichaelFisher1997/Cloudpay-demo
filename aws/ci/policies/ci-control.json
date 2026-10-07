@@ -126,7 +126,7 @@
         "application-autoscaling:RegisterScalableTarget",
         "application-autoscaling:TagResource"
       ],
-      "Resource": "arn:aws:application-autoscaling:eu-west-2:218549829565:scalable-target/*",
+      "Resource": "arn:aws:application-autoscaling:eu-west-2:218549829565:scalable-target/0ec5ce51b18de9d74bb1b5343ca6f527a47e",
       "Condition": {
         "StringEquals": {
           "aws:RequestedRegion": "eu-west-2",
@@ -152,7 +152,7 @@
         "application-autoscaling:PutScalingPolicy",
         "application-autoscaling:TagResource"
       ],
-      "Resource": "arn:aws:application-autoscaling:eu-west-2:218549829565:scalable-target/*",
+      "Resource": "arn:aws:application-autoscaling:eu-west-2:218549829565:scalable-target/0ec5ce51b18de9d74bb1b5343ca6f527a47e",
       "Condition": {
         "StringEquals": {
           "aws:RequestedRegion": "eu-west-2",

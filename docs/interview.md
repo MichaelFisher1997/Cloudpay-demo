@@ -22,6 +22,13 @@ All application deployments/image pushes/jobs run in Actions using OIDC; human
 SSO was restricted to reads and narrow DEV policy bootstrap. Production, Portyard,
 DNS and certificates were untouched.
 
+The final image is `sha256:52f132c7cb0264b64da5a6e6075757984c456a17f73e9b13b52bedb6b2852587`,
+with no ECR OS findings. [Release 37691404457](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37691404457)
+applied **8 additions / 1 in-place update / 0 deletions**, passed real auth/private
+S3 ownership/upload/download/delete smoke, and finished with **no Terraform changes**.
+For the interview, lead with modules, remote state/locking, reviewed plan/apply and
+OIDC; the app simply demonstrates that the infrastructure works together.
+
 ## What can be demonstrated locally
 
 - Cohesive Terraform modules, thin dev/prod roots, pinned versions and **27 mocked tests**.
@@ -29,7 +36,7 @@ DNS and certificates were untouched.
   the old 76-addition production plan remains historical/unapplied.
 - TanStack/Bun gallery with ownership checks, PostgreSQL-backed auth/sessions and
   direct private version-pinned S3 transfer design.
-- 15 unit tests plus 32 Python guard tests; local PG17/built-server HTTP integration with 49 assertions;
+- 15 unit tests plus 33 Python guard tests; local PG17/built-server HTTP integration with 49 assertions;
   non-root/read-only amd64 container smoke and zero dependency advisories at scan.
 - Cost comparison, explicit migration/runtime/master separation and runbooks.
 - Actual GitHub [validation run 37607324492](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37607324492)
@@ -39,7 +46,7 @@ DNS and certificates were untouched.
 Keep local mocks separate from real AWS evidence. ECR OS scanning caught vulnerable
 base packages that the clean app dependency audit did not cover; patches and a
 fail-closed scan gate are part of the release, not a claim of zero security risk.
-Interactive-browser, production failover/load and actual backup restore remain
+Task replacement, full metric/log auditing, interactive-browser, production failover/load and actual backup restore remain
 separate unverified work. A browserless CORS preflight verifies protocol headers,
 not every browser behavior.
 

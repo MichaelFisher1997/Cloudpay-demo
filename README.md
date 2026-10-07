@@ -1,32 +1,47 @@
 # Godiffy — CloudPay platform assessment
 
-A deliberately small photo-gallery application with a production-oriented AWS
-platform. The assessment emphasis is **Terraform design, security boundaries,
-operability, and defensible trade-offs**, not application complexity.
+A small **Terraform interview demo**. The photo gallery proves the AWS resources
+work together; the emphasis is modules, remote state, reviewed plans, IAM and
+GitHub Actions delivery—not application complexity or production certification.
 
 ## Current status
 
 - **Deployed and verified:** dedicated Godiffy S3 Terraform backend, native state
   locking, versioning, encryption, and six bootstrap resources. Local backups retained.
 - **DEV is running:** [HTTP ALB URL](http://godiffy-dev-alb-1345285825.eu-west-2.elb.amazonaws.com).
-  Private database bootstrap, migration and runtime TLS/privilege jobs passed.
-  Final release/security/smoke evidence is in [the deployment handoff](docs/dev-deployment.md).
+  Database jobs and real login/S3 upload/download/ownership/delete checks passed.
+  [Release run 37691404457](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37691404457)
+  applied **8 additions, 1 in-place update, 0 deletions** and finished with **no changes**.
 - **Production remains undeployed:** its historical 76-addition foundation plan
   is design evidence, not authorization or a current apply input.
 - No Portyard application infrastructure, production application resources or DNS
   records were changed.
-- **DEV-only Actions rollout authorized:** SSO has been renewed. Nine exact DEV
+- **DEV-only Actions delivery:** Nine exact DEV
   policies (five CI scopes and four task boundaries) were human-bootstrapped onto
   the deliberately reused OIDC role; its trust/profile are unchanged. Application
   deployment uses manual plan/apply/image Actions workflows only.
   See [dev deployment status](docs/dev-deployment.md).
 - Plans/state/dependencies and all credentials are excluded from Git.
-- **GitHub validation passed:** [run 37687056441](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37687056441)
+- **GitHub validation passed:** [run 37690611200](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37690611200)
   tests/builds the actual committed implementation without AWS credentials.
 
 DEV is intentionally HTTP-only: use disposable passwords and non-sensitive images.
 Production and domain/TLS work remain unauthorized. Do not interpret process-only
 health probes, local mocks or a scan as proof of production readiness.
+
+## Five-minute interview demo
+
+1. Open the site; register `interview@godiffy.invalid` with a **disposable** password,
+   then upload/download/delete a non-sensitive image.
+2. Walk through `terraform/environments/dev` and the focused modules in
+   `terraform/modules`: networking, storage, database and application.
+3. Show the Actions release's reviewed plan, successful apply and final **no-change**
+   plan. The app is evidence of the infrastructure, not the main presentation.
+4. Explain S3 remote state/native locking, private tasks/RDS, separate task roles,
+   OIDC without permanent keys, and the deliberate one-task/Single-AZ cost trade-off.
+5. State the estimated **$100–170/month** envelope and separately approved
+   [teardown](docs/teardown.md). Production, browser/load/restore and task-recovery
+   testing are not claimed.
 
 ## Design in brief
 
@@ -51,8 +66,8 @@ runtime SaaS dependencies in DEV.
 | Document | Purpose |
 | --- | --- |
 | [Architecture](docs/architecture.md) | Boundaries, modules, decisions and six Well-Architected pillars |
-| [Review handoff](docs/review.md) | Evidence, plan identities, outstanding approvals and next steps |
-| [Dev deployment status](docs/dev-deployment.md) | Current authorization, actual rollout evidence and checklist |
+| [Historical review](docs/review.md) | Earlier build-and-plan evidence, not the current inventory |
+| [DEV handoff](docs/dev-deployment.md) | Actual inventory, digest, AWS results and verification limits |
 | [Interview notes](docs/interview.md) | What is actually deployed versus tested locally or only designed |
 | [Costs](docs/costs.md) | Official London prices, assumptions and endpoint/NAT comparison |
 | [Operations](docs/operations.md) | Staged deployment, verification, rollback, recovery and TLS last |

@@ -114,6 +114,17 @@ class DevDeliveryTests(unittest.TestCase):
         self.assertTrue(all(item["Effect"] == "Deny" for item in retired))
         self.assertEqual(retired[0]["Resource"], "*")
 
+    def test_scaling_writes_can_be_pinned_without_restoring_bootstrap(self):
+        arn = "arn:aws:application-autoscaling:eu-west-2:218549829565:scalable-target/fixture"
+        policies = policies_module.generate(bootstrap_pass=False, scaling_arn=arn)
+        statements = {item["Sid"]: item for item in policies["ci-control"]["Statement"]}
+        for sid in ("CreateTaggedDevScalingTarget", "OnlyExistingDevScalingTarget"):
+            self.assertEqual(statements[sid]["Resource"], arn)
+        self.assertTrue(all(item["Effect"] == "Deny" for item in policies["boundary-bootstrap"]["Statement"]))
+        self.assertNotIn("godiffy-dev-bootstrap", json.dumps(next(item for item in policies["ci-iam"]["Statement"] if item["Sid"] == "PassOnlyDevECSTaskRoles")))
+        with self.assertRaises(ValueError):
+            policies_module.generate(bootstrap_pass=False, scaling_arn="arn:aws:application-autoscaling:eu-west-1:218549829565:scalable-target/fixture")
+
     def test_generated_policies_are_current(self):
         for name, policy in policies_module.generate().items():
             committed = json.loads((Path(__file__).parents[2] / "aws/ci/policies" / f"{name}.json").read_text())

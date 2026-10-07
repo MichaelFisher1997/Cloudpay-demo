@@ -57,8 +57,9 @@ Mutations require exact `Origin: APP_URL`; auth and image endpoints reject cross
   Those mocks are not real S3 or AWS RDS-master proof.
 - Actual Actions private jobs subsequently exercised RDS-managed initialization,
   Secrets Manager writes, validated RDS TLS, plaintext rejection and runtime
-  SQL/master/migration-secret restrictions. Real HTTP/S3 and recovery evidence is
-  tracked in the deployment handoff rather than inferred from local tests.
+  SQL/master/migration-secret restrictions. Final AWS HTTP/S3 auth, ownership,
+  upload/download/privacy/limits/delete smoke passed. Task-recovery testing was
+  not run; the deployment handoff separates these results from local tests.
 - All direct dependencies remain pinned and the lockfile frozen. Nitro is still a
   beta; Vite/Rolldown emits TanStack `use client` module-directive warnings. Better
   Auth's schema validator warns that its own generated `rateLimit.lastRequest`
