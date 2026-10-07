@@ -110,6 +110,17 @@
       }
     },
     {
+      "Sid": "RegionalDatabaseInstanceMetadata",
+      "Effect": "Allow",
+      "Action": "rds:DescribeDBInstances",
+      "Resource": "arn:aws:rds:eu-west-2:218549829565:db:*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "eu-west-2"
+        }
+      }
+    },
+    {
       "Sid": "OnlyDevSecretContainers",
       "Effect": "Allow",
       "Action": [

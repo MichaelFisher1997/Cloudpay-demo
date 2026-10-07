@@ -18,6 +18,7 @@ audit_module = load("check-dev-plan.py")
 policies_module = load("ci-policies.py")
 repair_module = load("repair-dev-log-state.py")
 verify_module = load("verify-dev.py")
+db_repair_module = load("repair-dev-db-state.py")
 
 
 class DevDeliveryTests(unittest.TestCase):
@@ -150,3 +151,35 @@ class LogSampleTests(unittest.TestCase):
             self.assertIsNotNone(verify_module.SECRET_PATTERN.search(message))
         for message in ("Schema migrated", "Request failed", "Runtime role denied master and migration secrets: PASS"):
             self.assertIsNone(verify_module.SECRET_PATTERN.search(message))
+
+
+class EmptyDatabaseRepairTests(unittest.TestCase):
+    def run_repair(self, *, initialized=False, recent=True, jobs=False, task=False):
+        state = {"resources": [{"module": "module.godiffy.module.database", "type": "aws_db_instance", "name": "this", "instances": [{"status": "tainted", "attributes": {"identifier": db_repair_module.NAME}}]}]}
+        if jobs:
+            state["resources"].append({"type": "aws_ecs_task_definition"})
+        database = {"InstanceCreateTime": datetime.now(timezone.utc).isoformat() if recent else "2000-01-01T00:00:00+00:00", "DBInstanceStatus": "available", "DBName": "godiffy", "DBInstanceClass": "db.t4g.micro", "PubliclyAccessible": False, "MultiAZ": False, "StorageEncrypted": True, "DeletionProtection": True, "DBInstanceArn": "arn:aws:rds:eu-west-2:218549829565:db:godiffy-dev-postgres"}
+        responses = [
+            {"Account": "218549829565", "Arn": "arn:aws:sts::218549829565:assumed-role/cloudpay-demo-github-actions/test"},
+            {"DBInstances": [database]},
+            {"TagList": [{"Key": key, "Value": value} for key, value in db_repair_module.TAGS.items()]},
+            {"VersionIdsToStages": {"fixture": ["AWSCURRENT"]} if initialized else {}},
+            {"VersionIdsToStages": {}},
+            {"taskArns": ["fixture"] if task else []},
+            {"taskArns": []},
+        ]
+        with patch.object(db_repair_module, "read", return_value=state), patch.object(db_repair_module, "aws", side_effect=responses), patch.object(db_repair_module.subprocess, "run") as mutate:
+            if not initialized and recent and not jobs and not task:
+                db_repair_module.main()
+                mutate.assert_called_once_with(["terraform", "-chdir=terraform/environments/dev", "untaint", db_repair_module.ADDRESS], check=True, timeout=120)
+            else:
+                with self.assertRaises(RuntimeError):
+                    db_repair_module.main()
+                mutate.assert_not_called()
+
+    def test_retains_only_failed_new_uninitialized_db(self):
+        self.run_repair()
+
+    def test_refuses_initialized_old_or_previously_run_application(self):
+        for options in ({"initialized": True}, {"recent": False}, {"jobs": True}, {"task": True}):
+            self.run_repair(**options)

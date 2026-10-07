@@ -22,6 +22,10 @@ on:
         type: boolean
         default: false
         description: Explicit failed-new empty DB-log read repair only; never deletes resources
+      repair_failed_database:
+        type: boolean
+        default: false
+        description: Explicit healthy, uninitialized failed-new DEV DB read repair; never deletes data
 
 permissions:
   contents: read
@@ -90,6 +94,9 @@ jobs:
       - name: Explicitly repair failed-new empty log group state without deletion
         if: inputs.repair_failed_log_group && inputs.phase == 'foundations'
         run: python3 scripts/repair-dev-log-state.py
+      - name: Explicitly retain healthy uninitialized failed-new DEV DB
+        if: inputs.repair_failed_database && inputs.phase == 'foundations'
+        run: python3 scripts/repair-dev-db-state.py
       - name: Saved DEV plan
         run: |
           umask 077
