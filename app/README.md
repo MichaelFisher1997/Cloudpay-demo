@@ -26,7 +26,7 @@ docker build --platform linux/amd64 -t godiffy:local .
 ## Environment / operator contract
 
 The Docker base additionally pins Alpine's published security fixes
-`libcrypto3/libssl3=3.5.8-r0` and `zlib=1.3.2-r1` in a shared build/runtime base.
+`libcrypto3/libssl3=3.5.9-r0` and `zlib=1.3.2-r1` in a shared build/runtime base.
 An unpatched Alpine candidate was also rejected (2 critical/8 high findings).
 Runtime still performs no package installs and keeps the non-root/read-only contract.
 

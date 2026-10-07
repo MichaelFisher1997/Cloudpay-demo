@@ -9,6 +9,7 @@ import json
 import re
 from pathlib import Path
 import subprocess
+import time
 from importlib.util import module_from_spec, spec_from_file_location
 
 ACCOUNT = "218549829565"
@@ -38,6 +39,21 @@ def require(condition, message):
         raise RuntimeError(message)
 
 
+def wait_replacement(read_task, read_health, previous_arn, digest, attempts=40):
+    for attempt in range(attempts):
+        candidate = read_task()
+        require(candidate["taskArn"] != previous_arn, "Task not replaced")
+        require(candidate["containers"][0]["imageDigest"] == digest, "Replacement image changed")
+        private_ips = [detail["value"] for attachment in candidate["attachments"] for detail in attachment["details"] if detail["name"] == "privateIPv4Address"]
+        require(len(private_ips) == 1, "Unexpected replacement private IP")
+        health = read_health(private_ips[0])
+        if candidate["healthStatus"] == "HEALTHY" and len(health) == 1 and health[0]["TargetHealth"]["State"] == "healthy":
+            return candidate
+        if attempt < attempts - 1:
+            time.sleep(5)
+    raise RuntimeError("Replacement container/ALB health did not converge")
+
+
 def main(outputs, replace):
     raw = json.loads(outputs.read_text())
     d = raw["deployment"]["value"]
@@ -47,12 +63,13 @@ def main(outputs, replace):
     require(identity["Account"] == ACCOUNT and f":assumed-role/cloudpay-demo-github-actions/" in identity["Arn"], "Expected GitHub OIDC role")
     results = {}
 
-    def tasks():
+    def tasks(healthy=True):
         listed = aws("ecs", "list-tasks", "--cluster", CLUSTER, "--service-name", SERVICE, "--desired-status", "RUNNING")["taskArns"]
         require(len(listed) == 1, "Expected one steady-state web task")
         values = aws("ecs", "describe-tasks", "--cluster", CLUSTER, "--tasks", *listed)["tasks"]
         require(len(values) == 1 and values[0]["group"] == f"service:{SERVICE}", "Unexpected task membership")
-        require(values[0]["lastStatus"] == "RUNNING" and values[0]["healthStatus"] == "HEALTHY", "Task unhealthy")
+        require(values[0]["lastStatus"] == "RUNNING", "Task not running")
+        require(not healthy or values[0]["healthStatus"] == "HEALTHY", "Task unhealthy")
         return values[0]
 
     task = tasks()
@@ -149,16 +166,23 @@ def main(outputs, replace):
     results["ecs_cpu_metric"] = "pass" if points else "pending_metric_latency"
 
     if replace:
+        started = time.monotonic()
         arn = task["taskArn"]
         require(arn.startswith(f"arn:aws:ecs:{REGION}:{ACCOUNT}:task/{CLUSTER}/"), "Unexpected recovery task ARN")
         aws("ecs", "stop-task", "--cluster", CLUSTER, "--task", arn, "--reason", "Authorized Godiffy DEV recovery verification")
         aws("ecs", "wait", "tasks-stopped", "--cluster", CLUSTER, "--tasks", arn)
         aws("ecs", "wait", "services-stable", "--cluster", CLUSTER, "--services", SERVICE)
-        replacement = tasks()
-        require(replacement["taskArn"] != arn, "Task not replaced")
+        # ECS services-stable checks counts, not container/ALB health. Wait for
+        # the one new private task's health explicitly before reusing sessions.
+        replacement = wait_replacement(
+            lambda: tasks(healthy=False),
+            lambda ip: aws("elbv2", "describe-target-health", "--target-group-arn", target_groups[0]["TargetGroupArn"], "--targets", f"Id={ip},Port=3000")["TargetHealthDescriptions"],
+            arn, d["image_digest"],
+        )
         results["single_task_replacement"] = "pass"
         results["replacement_task"] = replacement["taskArn"]
-    print(json.dumps({"outcome": "pass", "checks": results, "scalable_target_arn": target[0]["ScalableTargetARN"]}))
+        results["recovery_seconds"] = round(time.monotonic() - started, 1)
+    print(json.dumps({"outcome": "pass", "checks": results, "task_arn": task["taskArn"], "scalable_target_arn": target[0]["ScalableTargetARN"]}))
 
 
 if __name__ == "__main__":

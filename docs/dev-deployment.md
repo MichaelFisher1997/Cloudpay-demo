@@ -93,6 +93,11 @@ exposed a `tee` exit-status masking bug: all DEV workflows now explicitly select
 Bash with `pipefail`, and scan creation/completion has a bounded wait. The final
 candidate pins Alpine's published fixes `libcrypto3/libssl3=3.5.8-r0` and
 `zlib=1.3.2-r1` in both build/runtime stages; it must pass the actual ECR gate.
+Credential-free [validation 37689042734](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37689042734)
+passed code/tests but refused the package pin: the repository now offers OpenSSL
+**3.5.9-r0**, not the older 3.5.8 fix version listed by the security database. The
+actual signed package index was checked and the exact build/runtime pin corrected
+to 3.5.9-r0; no failing image was deployed.
 Release-history review also caught a repeat-plan edge case: ordinary retained image
 digests could inadvertently create a fresh, already-retired bootstrap definition.
 Actions now reads actual task-definition keys in memory and retains initialization

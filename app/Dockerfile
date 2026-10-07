@@ -1,6 +1,6 @@
 FROM oven/bun:1.4.2-alpine@sha256:d888c0ae6c86d7866ff10c5aafdd9077b36aee6455b33dd270fb93c0dd5cef6f AS base
 # Exact Alpine security fixes for the ECR OpenSSL/zlib findings; no runtime installs.
-RUN apk add --no-cache --upgrade libcrypto3=3.5.8-r0 libssl3=3.5.8-r0 zlib=1.3.2-r1
+RUN apk add --no-cache --upgrade libcrypto3=3.5.9-r0 libssl3=3.5.9-r0 zlib=1.3.2-r1
 
 FROM base AS build
 WORKDIR /app

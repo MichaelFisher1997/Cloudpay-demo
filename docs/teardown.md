@@ -84,7 +84,7 @@ excluded or migrated to an approved retained-resource configuration, never force
 
 After application retirement, separately review removal of the five
 `godiffy-dev-ci-{network,data,services,control,iam}` attachments from the reused OIDC
-role and deletion of the nine dedicated policies/four boundaries, once no task role
+role and deletion of the nine dedicated policies (five CI scopes/four boundaries), once no task role
 uses a boundary. This needs removal of their DEV `prevent_destroy` protection and
 an approved IAM retirement step/identity that does not revoke itself mid-operation.
 The original role/provider/trust remain identity-only afterward. Remove the temporary

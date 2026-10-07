@@ -17,7 +17,15 @@ const png = Buffer.from(
 const checksum = createHash("sha256").update(png).digest("base64");
 type Fixture = { ownerPassword: string; otherPassword: string };
 type Result = { check: string; status: "pass" | "fail"; httpStatus?: number };
-const evidence: { results: Result[]; outcome: "pass" | "fail" } = {
+const evidence: {
+  results: Result[];
+  outcome: "pass" | "fail";
+  recovery?: {
+    previous_task: string;
+    replacement_task: string;
+    seconds: number;
+  };
+} = {
   results: [],
   outcome: "fail",
 };
@@ -200,7 +208,15 @@ async function main() {
       const output = await new Response(command.stdout).text();
       await new Response(command.stderr).text(); // Discard; never dump SDK errors.
       assert((await command.exited) === 0);
-      assert(object(JSON.parse(output)).outcome === "pass");
+      const recovered = object(JSON.parse(output));
+      assert(recovered.outcome === "pass");
+      const checks = object(recovered.checks);
+      assert(typeof checks.recovery_seconds === "number");
+      evidence.recovery = {
+        previous_task: string(recovered.task_arn),
+        replacement_task: string(checks.replacement_task),
+        seconds: checks.recovery_seconds,
+      };
       record("single-task replaced; saved sessions retained");
     }
     expectStatus(await app("/api/images/"), [401], "anonymous gallery denied");

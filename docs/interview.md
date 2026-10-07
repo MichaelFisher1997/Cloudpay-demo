@@ -2,31 +2,46 @@
 
 ## What is actually deployed
 
-Only the dedicated Godiffy Terraform S3 backend is live: versioning, SSE-S3,
-public-access blocking, ACL disabling, TLS enforcement and native lockfiles.
-The approved bootstrap applied **6 additions, no changes/deletions** and was
-verified during the build-and-plan stage. Local backups were retained securely.
+DEV runs at **http://godiffy-dev-alb-1345285825.eu-west-2.elb.amazonaws.com** in
+account `218549829565`, London. It uses a two-AZ public ALB, private Fargate task,
+private Single-AZ RDS PostgreSQL 17.9 and private versioned S3. Four single-AZ
+interface endpoints plus an S3 gateway replace NAT. The independent six-resource
+state backend retains encryption, versioning, native locking and protected backups.
 
-The application platform has **not** been deployed. DEV deployment is approved,
-but expired AWS SSO authentication currently blocks it. No ALB application URL
-or real AWS application test result should be presented. See
-[deployment status](dev-deployment.md).
+Actual private bootstrap, migration and runtime-verification jobs exited 0.
+They proved RDS-managed initialization, Secrets Manager writes, validated TLS,
+plaintext rejection and restricted runtime SQL/master/migration-secret access.
+Initial service creation reached AWS but Terraform's status reader lacked a
+permission; the healthy original service was retained through an explicitly
+approved guarded Actions repair, not deleted/replaced.
+
+Use [the deployment handoff](dev-deployment.md) for the **current final digest,
+HTTP/S3/recovery results, inventory, costs and remaining gaps**. Do not present a
+candidate image's publication or process-only probes as complete verification.
+All application deployments/image pushes/jobs run in Actions using OIDC; human
+SSO was restricted to reads and narrow DEV policy bootstrap. Production, Portyard,
+DNS and certificates were untouched.
 
 ## What can be demonstrated locally
 
-- Cohesive Terraform modules, thin dev/prod roots, pinned versions and 24 mocked tests.
-- 72-addition DEV and 76-addition prod foundation plans, neither applied.
+- Cohesive Terraform modules, thin dev/prod roots, pinned versions and **27 mocked tests**.
+- DEV no-delete/fingerprint plans, focused retry records and retained release history;
+  the old 76-addition production plan remains historical/unapplied.
 - TanStack/Bun gallery with ownership checks, PostgreSQL-backed auth/sessions and
   direct private version-pinned S3 transfer design.
-- 13 unit tests; local PG17/built-server HTTP integration with 49 assertions;
+- 15 unit tests plus 32 Python guard tests; local PG17/built-server HTTP integration with 49 assertions;
   non-root/read-only amd64 container smoke and zero dependency advisories at scan.
 - Cost comparison, explicit migration/runtime/master separation and runbooks.
 - Actual GitHub [validation run 37607324492](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37607324492)
   passed against committed code, including the built server/local PostgreSQL and
   container checks. It is credential-free validation, not deployed AWS verification.
 
-Do not describe local mocks as successful RDS, S3 browser CORS, Fargate networking,
-OIDC delivery, failover or restore testing. The AWS deployment gap must be stated.
+Keep local mocks separate from real AWS evidence. ECR OS scanning caught vulnerable
+base packages that the clean app dependency audit did not cover; patches and a
+fail-closed scan gate are part of the release, not a claim of zero security risk.
+Interactive-browser, production failover/load and actual backup restore remain
+separate unverified work. A browserless CORS preflight verifies protocol headers,
+not every browser behavior.
 
 ## Architecture rationale to discuss
 

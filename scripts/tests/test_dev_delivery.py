@@ -289,3 +289,18 @@ class RevisionHistoryTests(unittest.TestCase):
         state["resources"][1]["instances"].append({"index_key": "latest/bootstrap"})
         with self.assertRaises(ValueError):
             revision_module.revision_inputs(state)
+
+
+class RecoveryHealthTests(unittest.TestCase):
+    def test_waits_for_container_and_exact_replacement_target_health(self):
+        digest = "sha256:" + "a" * 64
+        task = {"taskArn": "replacement", "containers": [{"imageDigest": digest}], "healthStatus": "HEALTHY", "attachments": [{"details": [{"name": "privateIPv4Address", "value": "10.42.10.10"}]}]}
+        read_health = unittest.mock.Mock(side_effect=[[{"TargetHealth": {"State": "initial"}}], [{"TargetHealth": {"State": "healthy"}}]])
+        with patch.object(verify_module.time, "sleep"):
+            self.assertEqual(verify_module.wait_replacement(lambda: task, read_health, "old", digest, attempts=2), task)
+        read_health.assert_called_with("10.42.10.10")
+        with patch.object(verify_module.time, "sleep"):
+            with self.assertRaises(RuntimeError):
+                verify_module.wait_replacement(lambda: task, lambda ip: [{"TargetHealth": {"State": "initial"}}], "old", digest, attempts=2)
+        with self.assertRaises(RuntimeError):
+            verify_module.wait_replacement(lambda: task, lambda ip: [], "old", "sha256:" + "b" * 64)
