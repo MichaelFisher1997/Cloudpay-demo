@@ -1,6 +1,9 @@
-# Godiffy — application draft
+# Godiffy — application
 
-Single-container TanStack Start + Bun, PostgreSQL sessions, private versioned S3 images. **Build and plan only: no AWS deployment.** Better Auth and invitation design await architect approval.
+Single-container TanStack Start + Bun, PostgreSQL sessions, private versioned S3 images.
+DEV deployment is authorized and running through GitHub Actions; the exact tested
+URL, digest and verification limits are recorded in [deployment status](../docs/dev-deployment.md).
+Production registration and deployment remain blocked pending separate approval.
 
 ## Commands
 
@@ -18,7 +21,7 @@ bun run db:migrate
 docker build --platform linux/amd64 -t godiffy:local .
 ```
 
-`GET /health/live` and `/health/ready` are process-only 200 probes, deliberately independent of PostgreSQL. Container binds `0.0.0.0:3000`; Docker CMD runs config preflight then `exec`s Bun so Bun receives SIGTERM. Runtime user is `10001:10001`; the image runs with a read-only filesystem. The multiarch `oven/bun:1.4.2` base is pinned to OCI index `sha256:9114c058aeae42162ee16dd5084b95fe9473970bb6bcb5b232ab1630f0546895`; deployment must select linux/amd64. For local PG17 integration tests, run `bun scripts/test-database.ts` from the repository root, which creates a unique temporary `postgres:17-alpine` Docker container, ephemeral password, and host-only random port; it runs `PG_TEST_URL=postgres://... bun test tests/integration.test.ts` inside `app/` without printing credentials. From `app/`, `bun run test:built` first builds then uses that same isolated local runner to exercise the **actual `.output` server** over HTTP: signup, login, session, gallery DB query, blocked outsider and CSRF. The test intentionally sets `NODE_ENV=development`, `ENVIRONMENT=dev`, and loopback `DATABASE_URL`; it does **not** test production AWS/RDS TLS. The integration test has no AWS calls (in-memory Secrets Manager port and S3 port); without `PG_TEST_URL` it skips. Stop only your own named test container.
+`GET /health/live` and `/health/ready` are process-only 200 probes, deliberately independent of PostgreSQL. Container binds `0.0.0.0:3000`; Docker CMD runs config preflight then `exec`s Bun so Bun receives SIGTERM. Runtime user is `10001:10001`; the image runs with a read-only filesystem. The multiarch `oven/bun:1.4.2-alpine` base is pinned to OCI index `sha256:d888c0ae6c86d7866ff10c5aafdd9077b36aee6455b33dd270fb93c0dd5cef6f`; deployment must select linux/amd64. The earlier Debian base had six critical and 19 high OS-package findings; the Alpine replacement retains the same Bun version, and publication/deployment now require a complete ECR scan with no critical/high findings. This OS scan does not cover every statically linked library or prove absence of vulnerabilities. For local PG17 integration tests, run `bun scripts/test-database.ts` from the repository root, which creates a unique temporary `postgres:17-alpine` Docker container, ephemeral password, and host-only random port; it runs `PG_TEST_URL=postgres://... bun test tests/integration.test.ts` inside `app/` without printing credentials. From `app/`, `bun run test:built` first builds then uses that same isolated local runner to exercise the **actual `.output` server** over HTTP: signup, login, session, gallery DB query, blocked outsider and CSRF. The test intentionally sets `NODE_ENV=development`, `ENVIRONMENT=dev`, and loopback `DATABASE_URL`; it does **not** test production AWS/RDS TLS. The integration test has no AWS calls (in-memory Secrets Manager port and S3 port); without `PG_TEST_URL` it skips. Stop only your own named test container.
 
 ## Environment / operator contract
 

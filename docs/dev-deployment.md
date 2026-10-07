@@ -78,6 +78,14 @@ the pause ([run 37686112370](https://github.com/MichaelFisher1997/Cloudpay-demo/
 The user then explicitly approved pinning it to the original creation timestamp
 **2026-10-07 14:27:37.018 UTC**, rather than broadening the age window. All other
 identity/image/private-network/health guards remain required.
+[Repair/plan 37686483704](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37686483704)
+verified all guards, retained the original service and reviewed **5 additions, 0
+changes, 0 deletions** (three service alarms and autoscaling target/policy).
+The apply was deferred after the published Debian image's ECR OS scan reported
+**6 critical, 19 high, 12 medium, 6 low** findings. A same-version, digest-pinned
+Alpine image built and passed non-root/read-only/production fail-closed checks locally.
+Image publication and jobs/service deployment now require a completed ECR OS scan
+with no critical/high findings; a fresh scanned release will be reviewed before apply.
 
 The implementation and status/runbooks were committed and pushed to `master` in
 `7809dabb87812ae9da125003a5d7d8df826c9bc9`. GitHub

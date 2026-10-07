@@ -21,6 +21,7 @@ verify_module = load("verify-dev.py")
 db_repair_module = load("repair-dev-db-state.py")
 job_module = load("run-dev-job.py")
 service_repair_module = load("repair-dev-service-state.py")
+scan_module = load("check-image-scan.py")
 
 
 class DevDeliveryTests(unittest.TestCase):
@@ -243,3 +244,20 @@ class HealthyServiceRepairTests(unittest.TestCase):
     def test_refuses_ordinary_other_creation_unowned_public_wrong_image_or_unhealthy_service(self):
         for key in ("tainted", "original", "owned", "image", "private", "healthy", "actions", "exact"):
             self.run_repair(**{key: False})
+
+
+class ImageScanTests(unittest.TestCase):
+    def setUp(self):
+        self.digest = "sha256:" + "a" * 64
+        self.scan = {"registryId": "218549829565", "repositoryName": "godiffy-dev-application", "imageId": {"imageDigest": self.digest}, "imageScanStatus": {"status": "COMPLETE"}, "imageScanFindings": {"findingSeverityCounts": {"LOW": 1}}}
+
+    def test_exact_completed_scan_without_critical_high_findings(self):
+        self.assertEqual(scan_module.audit_scan(self.scan, self.digest)["severity_counts"], {"LOW": 1})
+
+    def test_refuses_wrong_target_incomplete_or_severe_findings(self):
+        for key, value in (("registryId", "123456789012"), ("repositoryName", "portyard"), ("imageScanStatus", {"status": "IN_PROGRESS"}), ("imageId", {"imageDigest": "sha256:" + "b" * 64})):
+            with self.assertRaises(ValueError):
+                scan_module.audit_scan({**self.scan, key: value}, self.digest)
+        for severity in ("HIGH", "CRITICAL"):
+            with self.assertRaises(ValueError):
+                scan_module.audit_scan({**self.scan, "imageScanFindings": {"findingSeverityCounts": {severity: 1}}}, self.digest)

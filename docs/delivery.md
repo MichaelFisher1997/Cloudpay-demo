@@ -48,7 +48,7 @@ All other application writes are dedicated DEV names/ARNs or tag-guarded resourc
 regional discovery uses explicit read actions. Initial scalable-target creation
 requires DEV ownership tags and is tightened to its exact generated ARN afterward.
 RDS-managed master-secret creation/tagging is initially restricted to RDS forward
-access; this authorization path still requires actual AWS verification.
+  access; Actions created the managed master secret successfully in the foundation rollout.
 
 ### Manual delivery workflows
 
@@ -59,6 +59,9 @@ access; this authorization path still requires actual AWS verification.
   domain/ACM input, expensive shape or self-IAM update stops execution.
 - `dev-image.yml`: amd64 build/read-only smoke and immutable commit-tagged push to
   the exact DEV ECR repository. It reports the manifest digest, not credentials.
+  Publication and jobs/service deployment require the exact digest's completed ECR
+  OS scan with zero critical/high findings. App dependency advisories are checked
+  separately; neither scan is a blanket security certification.
 - Private bootstrap/migration/DB-verification jobs run via Actions with no public
   task IP. Service activation re-verifies the DB before apply, then exercises real
   HTTP auth/ownership and direct S3 POST/CORS/checksum/size/download/deletion.

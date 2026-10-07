@@ -9,6 +9,7 @@ import json
 import re
 from pathlib import Path
 import subprocess
+from importlib.util import module_from_spec, spec_from_file_location
 
 ACCOUNT = "218549829565"
 REGION = "eu-west-2"
@@ -16,6 +17,9 @@ CLUSTER = "godiffy-dev-cluster"
 SERVICE = "godiffy-dev-web"
 TAGS = {"Project": "godiffy", "Environment": "dev", "ManagedBy": "terraform", "Purpose": "cloudpay-technical-assessment"}
 SECRET_PATTERN = re.compile(r"x-amz-(?:signature|security-token)=|\b(?:AKIA|ASIA)[A-Z0-9]{16}\b|\bPASSWORD\s+'|\b(?:password|auth_secret|secret_access_key|aws_session_token)[\"']?\s*[:=]\s*\S+", re.IGNORECASE)
+scan_spec = spec_from_file_location("check_image_scan", Path(__file__).with_name("check-image-scan.py"))
+scan_module = module_from_spec(scan_spec)
+scan_spec.loader.exec_module(scan_module)
 
 
 def aws(*args, denied=False):
@@ -55,7 +59,7 @@ def main(outputs, replace):
     require(len(task["containers"]) == 1 and task["containers"][0]["imageDigest"] == d["image_digest"], "Unexpected running image digest")
     results["private_immutable_ecr_pull"] = "pass"
     scan = aws("ecr", "describe-image-scan-findings", "--repository-name", "godiffy-dev-application", "--image-id", f"imageDigest={d['image_digest']}")
-    results["ecr_scan"] = {"status": scan["imageScanStatus"]["status"], "severity_counts": scan.get("imageScanFindings", {}).get("findingSeverityCounts", {})}
+    results["ecr_scan"] = scan_module.audit_scan(scan, d["image_digest"])
     enis = [detail["value"] for attachment in task["attachments"] for detail in attachment["details"] if detail["name"] == "networkInterfaceId"]
     require(len(enis) == 1, "Expected one task ENI")
     eni = aws("ec2", "describe-network-interfaces", "--network-interface-ids", enis[0])["NetworkInterfaces"][0]

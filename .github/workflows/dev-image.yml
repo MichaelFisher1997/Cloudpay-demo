@@ -42,3 +42,7 @@ jobs:
           docker push "$REGISTRY/godiffy-dev-application:$GITHUB_SHA"
           aws ecr describe-images --region eu-west-2 --repository-name godiffy-dev-application --image-ids "imageTag=$GITHUB_SHA" --query 'imageDetails[0].{digest:imageDigest,tags:imageTags}' --output json | tee image.json
           cat image.json >> "$GITHUB_STEP_SUMMARY"
+      - name: Require a completed OS scan without critical or high findings
+        run: |
+          python3 scripts/check-image-scan.py image.json | tee image-scan.json
+          cat image-scan.json >> "$GITHUB_STEP_SUMMARY"
