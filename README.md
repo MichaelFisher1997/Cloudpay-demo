@@ -17,6 +17,8 @@ operability, and defensible trade-offs**, not application complexity.
 - **DEV deployment authorized, authentication blocked:** the `portyard` SSO session
   expired and AWS rejected its refresh token. See [dev deployment status](docs/dev-deployment.md).
 - Plans/state/dependencies and all credentials are excluded from Git.
+- **GitHub validation passed:** [run 37607324492](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37607324492)
+  tests/builds the actual committed implementation without AWS credentials.
 
 DEV-only autonomous deployment is now authorized within the agreed architecture
 and safety limits, but has not started without valid AWS authentication. Production

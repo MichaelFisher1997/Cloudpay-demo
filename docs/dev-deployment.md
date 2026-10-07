@@ -17,6 +17,15 @@ No Terraform apply, ECR push, AWS job, DEV IAM permission change or application
 resource mutation was performed in this attempt. No alternate credentials were
 introduced. GitHub repository access is independent of this AWS login.
 
+The implementation and status/runbooks were committed and pushed to `master` in
+`7809dabb87812ae9da125003a5d7d8df826c9bc9`. GitHub
+[validation run 37607324492](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37607324492)
+**passed**: 24 mocked Terraform runs, app formatting/types/13 unit tests,
+local PostgreSQL and actual built-server HTTP integration, dependency advisory
+check, amd64 Docker build, and read-only/non-root/production guard smoke. This
+workflow has no AWS credentials or deployment authority. No deployment workflow
+was run and no DEV OIDC IAM permissions could be configured without AWS access.
+
 Restore the existing session on the user's machine, then resume this authorization:
 
 ```sh
@@ -41,6 +50,7 @@ Do not send tokens/passwords in chat, replace the profile or create access keys.
 | Bootstrap/migration | Local PG17 and actual built-server HTTP tests pass; no AWS job run |
 | IAM task roles | Planned execution/runtime/migration roles; none created in DEV |
 | GitHub OIDC | Existing provider and authentication-only role unchanged; no DEV deployment permissions granted |
+| GitHub validation | Run 37607324492 succeeded for commit 7809dab; no AWS deployment step |
 | Real AWS tests in this attempt | Authentication/connectivity preflight only; resource verification is blocked |
 | Failure | Expired SSO session and invalid refresh grant; requires interactive login, not an architecture or IAM workaround |
 | Still unverified | Entire deployed DEV path, private ECR pull, RDS master privileges/TLS, real S3 semantics, ALB health, logs/metrics, alarms, task replacement and OIDC deployment |

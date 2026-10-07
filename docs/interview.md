@@ -21,6 +21,9 @@ or real AWS application test result should be presented. See
 - 13 unit tests; local PG17/built-server HTTP integration with 49 assertions;
   non-root/read-only amd64 container smoke and zero dependency advisories at scan.
 - Cost comparison, explicit migration/runtime/master separation and runbooks.
+- Actual GitHub [validation run 37607324492](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37607324492)
+  passed against committed code, including the built server/local PostgreSQL and
+  container checks. It is credential-free validation, not deployed AWS verification.
 
 Do not describe local mocks as successful RDS, S3 browser CORS, Fargate networking,
 OIDC delivery, failover or restore testing. The AWS deployment gap must be stated.

@@ -26,11 +26,11 @@ AWS DB job execution or new CI permission grant was performed during that stage.
 | `terraform/modules/` | Cohesive network/storage/database/application modules with environment composition and alarms |
 | `terraform/environments/dev/` | Single-task/Single-AZ dev draft; default foundations only |
 | `terraform/environments/prod/` | Two-AZ production draft, safety guards; default foundations only |
-| `.github/workflows/validate.yml` | No-AWS validation/image build, pinned actions; locally linted, not pushed/run on GitHub |
+| `.github/workflows/validate.yml` | No-AWS validation/image build, pinned actions; subsequently pushed and verified by GitHub run 37607324492 |
 | `scripts/` | Repeatable validation, isolated PG integration and create-only foundation scope audit |
 | `docs/` | Architecture/diagram, six pillars, cost worksheet, operations and delivery approval design |
 
-The build work is being committed/pushed under the subsequent DEV authorization.
+The build work was committed/pushed as `7809dab` under the subsequent DEV authorization.
 Generated dependencies/builds, state,
 local tfvars and binary/text plan artifacts are ignored, not public evidence dumps.
 
@@ -84,7 +84,9 @@ a Terraform secret-value resource. Tagged ECR release images are retained.
   choice and review upgrade cadence before production.
 - Built linux/amd64 image smoke tests verify UI/process probes with non-root,
   read-only runtime and fail-closed production HTTP/insecure configuration.
-- Actionlint and ShellCheck pass locally. GitHub-hosted CI has not run yet.
+- Actionlint and ShellCheck pass locally. Subsequent GitHub-hosted
+  [validation run 37607324492](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37607324492)
+  passed all tests/build/container checks without AWS credentials.
 
 Remaining library warnings are recorded in `app/README.md`: Nitro beta/Rolldown
 module-directive diagnostics and Better Auth's generated bigint rate-limit schema

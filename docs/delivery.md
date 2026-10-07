@@ -13,8 +13,14 @@ It has only `contents: read`, does not persist checkout credentials, requests no
 OIDC token, uses no AWS credentials/backend, and does not push images or apply
 infrastructure. Fork PR code must never run with deployment credentials.
 The existing authentication-only OIDC check is preserved byte-for-byte.
-Local actionlint/ShellCheck pass; the new workflow has not been pushed or run in
-GitHub, so a GitHub CI success is not yet claimed.
+Local actionlint/ShellCheck pass. The new workflow was committed/pushed in
+`7809dabb87812ae9da125003a5d7d8df826c9bc9`; GitHub
+[run 37607324492](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37607324492)
+passed Terraform/app tests, actual built-server/local PostgreSQL integration,
+dependency audit, Docker build and read-only/non-root smoke. This verifies the
+credential-free validation path, **not AWS deployment**. The actions emitted a
+Node 20 deprecation annotation while running under GitHub's forced Node 24 runtime;
+the workflow succeeded. Review action/runner pins as part of maintenance.
 
 ## Proposed privilege boundaries — not provisioned
 
