@@ -1,0 +1,208 @@
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  color: #252923;
+  background: #f6f6f0;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+button,
+input {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+}
+.shell {
+  max-width: 1180px;
+  margin: auto;
+  padding: 0 32px;
+}
+header {
+  height: 90px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #dfdfd5;
+}
+.brand {
+  font-size: 22px;
+  letter-spacing: -0.06em;
+  color: #276548;
+}
+.brand strong {
+  letter-spacing: -0.05em;
+}
+.account {
+  display: flex;
+  gap: 22px;
+  align-items: center;
+  color: #626a61;
+  font-size: 13px;
+}
+.account button,
+.actions button,
+.link {
+  border: 0;
+  background: transparent;
+  color: #276548;
+  font-weight: 650;
+}
+.login {
+  max-width: 430px;
+  margin: 100px auto;
+}
+.eyebrow {
+  color: #36845b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+}
+.login h1,
+.gallery h1 {
+  font-size: clamp(32px, 4vw, 50px);
+  letter-spacing: -0.06em;
+  line-height: 1.1;
+  margin: 10px 0;
+}
+.muted {
+  color: #767c72;
+  line-height: 1.6;
+}
+.login form {
+  display: grid;
+  gap: 18px;
+  margin: 36px 0 20px;
+}
+.login label {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 650;
+}
+.login input {
+  padding: 14px;
+  border: 1px solid #d7dcd2;
+  border-radius: 9px;
+  background: #fff;
+  outline-color: #36845b;
+}
+.primary,
+.upload {
+  background: #276548;
+  color: white;
+  border: 0;
+  border-radius: 9px;
+  padding: 14px 20px;
+  font-weight: 700;
+  text-align: center;
+}
+.primary:disabled,
+.upload:has(input:disabled) {
+  opacity: 0.6;
+}
+.link {
+  padding: 0;
+}
+.gallery {
+  padding: 65px 0;
+}
+.heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+.upload input {
+  display: none;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 22px;
+  margin-top: 45px;
+}
+.grid article {
+  background: #fff;
+  border-radius: 13px;
+  overflow: hidden;
+  border: 1px solid #e7e8e0;
+}
+.placeholder {
+  height: 195px;
+  background: linear-gradient(145deg, #d5e5d6, #e7ebdc);
+  display: grid;
+  place-items: center;
+  color: #72a489;
+  font-size: 48px;
+}
+.details {
+  padding: 16px;
+}
+.details strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.details small {
+  color: #848a80;
+}
+.actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 15px;
+}
+.actions button {
+  padding: 4px 0;
+}
+.empty {
+  text-align: center;
+  margin: 65px auto;
+  border: 1px dashed #c9d0c4;
+  border-radius: 18px;
+  padding: 70px 20px;
+  color: #7b8578;
+}
+.empty span {
+  font-size: 40px;
+  color: #68a17c;
+}
+.empty h2 {
+  color: #252923;
+}
+.error {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: #853e3e;
+  color: #fff;
+  border-radius: 9px;
+  padding: 14px 20px;
+  max-width: 360px;
+}
+@media (max-width: 600px) {
+  .shell {
+    padding: 0 18px;
+  }
+  header {
+    height: 72px;
+  }
+  .account span {
+    display: none;
+  }
+  .login {
+    margin: 65px auto;
+  }
+  .gallery {
+    padding: 45px 0;
+  }
+  .heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .upload {
+    width: 100%;
+  }
+}

@@ -1,0 +1,46 @@
+name: Godiffy validation (no AWS deployment)
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TF_IN_AUTOMATION: "true"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: 1.16.5
+          terraform_wrapper: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.4.2
+      - name: Terraform mock tests and application validation
+        env:
+          TF_PLUGIN_CACHE_DIR: ${{ runner.temp }}/godiffy-terraform-cache
+        run: bash scripts/verify.sh
+      - name: PostgreSQL and built-server HTTP integration (local only)
+        working-directory: app
+        run: bun run test:built
+      - name: Dependency advisory check
+        working-directory: app
+        run: bun audit
+      - name: Build application image without pushing
+        run: docker build --platform linux/amd64 --tag godiffy:validation app
+      - name: Read-only non-root image smoke and production config guards
+        run: bun scripts/smoke-image.ts godiffy:validation

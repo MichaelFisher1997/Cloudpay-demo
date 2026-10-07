@@ -1,0 +1,35 @@
+# Terraform working directories, state, and saved plans can contain sensitive data.
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfplan.*
+crash.log
+crash.*.log
+
+# Local credentials and overrides must not be committed.
+.env
+.env.*
+!.env.example
+*.local.tfvars
+*.local.tfvars.json
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# Commit .terraform.lock.hcl: it pins provider versions and checksums.
+
+# Application dependencies and generated build artifacts.
+**/node_modules/
+**/.output/
+**/.nitro/
+**/.tanstack/
+**/dist/
+**/coverage/
+*.log
+.terraform-provider-cache/
+.terraform-validation/
+**/__pycache__/
