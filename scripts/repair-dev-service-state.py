@@ -1,10 +1,10 @@
 """Explicitly approved retention of the healthy DEV service after a failed status read.
 
-Verifies the exact recent service, immutable image, private network and ALB health.
+Verifies the original service creation, immutable image, private network and ALB health.
 Changes only Terraform's failed-read taint, never AWS resources or application data.
 """
 import argparse
-from datetime import datetime, timezone
+from datetime import datetime
 import json
 import re
 import subprocess
@@ -15,6 +15,9 @@ CLUSTER = "godiffy-dev-cluster"
 SERVICE = "godiffy-dev-web"
 CLUSTER_ARN = f"arn:aws:ecs:{REGION}:{ACCOUNT}:cluster/{CLUSTER}"
 SERVICE_ARN = f"arn:aws:ecs:{REGION}:{ACCOUNT}:service/{CLUSTER}/{SERVICE}"
+# Explicitly approved after the relative six-hour guard expired during the pause.
+# Exact creation pins this one failed attempt; no broader age window is accepted.
+APPROVED_CREATION = datetime.fromisoformat("2026-10-07T14:27:37.018000+00:00")
 ADDRESS = "module.godiffy.module.application.aws_ecs_service.this[0]"
 TAGS = {"Project": "godiffy", "Environment": "dev", "ManagedBy": "terraform", "Purpose": "cloudpay-technical-assessment"}
 
@@ -54,8 +57,7 @@ def main(digest):
     response = aws("ecs", "describe-services", "--cluster", CLUSTER, "--services", SERVICE, "--include", "TAGS")
     require(not response.get("failures") and len(response["services"]) == 1, "Expected exact existing service")
     service = response["services"][0]
-    age = datetime.now(timezone.utc).timestamp() - datetime.fromisoformat(service["createdAt"]).timestamp()
-    require(0 <= age < 6 * 3600, "Only recent failed-new service is repairable")
+    require(datetime.fromisoformat(service["createdAt"]) == APPROVED_CREATION, "Only the exact approved original service creation is repairable")
     require(service["serviceArn"] == SERVICE_ARN and service["clusterArn"] == CLUSTER_ARN and service["status"] == "ACTIVE", "Wrong service identity/status")
     require({tag["key"]: tag["value"] for tag in service["tags"]} == TAGS, "Wrong service ownership")
     require(service["desiredCount"] == 1 and service["runningCount"] == 1 and service["pendingCount"] == 0 and service["taskDefinition"] == definition, "Wrong replica count or definition")
@@ -81,7 +83,7 @@ def main(digest):
     health = aws("elbv2", "describe-target-health", "--target-group-arn", balancers[0]["targetGroupArn"])["TargetHealthDescriptions"]
     require(len(health) == 1 and health[0]["Target"]["Id"] == eni["PrivateIpAddress"] and health[0]["TargetHealth"]["State"] == "healthy", "ALB target not healthy/exact")
     subprocess.run(["terraform", "-chdir=terraform/environments/dev", "untaint", ADDRESS], check=True, timeout=120)
-    print("Verified exact recent healthy DEV service, private task, immutable image and ALB target; cleared only failed-read taint without replacement/deletion.")
+    print("Verified original healthy DEV service creation, private task, immutable image and ALB target; cleared only failed-read taint without replacement/deletion.")
 
 
 if __name__ == "__main__":

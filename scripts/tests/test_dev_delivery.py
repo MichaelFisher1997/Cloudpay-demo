@@ -211,7 +211,7 @@ class ActionsJobTests(unittest.TestCase):
 
 
 class HealthyServiceRepairTests(unittest.TestCase):
-    def run_repair(self, *, tainted=True, recent=True, owned=True, image=True, private=True, healthy=True, actions=True, exact=True):
+    def run_repair(self, *, tainted=True, original=True, owned=True, image=True, private=True, healthy=True, actions=True, exact=True):
         m = service_repair_module
         digest = "sha256:" + "a" * 64
         definition = f"arn:aws:ecs:{m.REGION}:{m.ACCOUNT}:task-definition/{m.SERVICE}:1"
@@ -220,7 +220,7 @@ class HealthyServiceRepairTests(unittest.TestCase):
             {"module": "module.godiffy.module.application", "type": "aws_ecs_service", "name": "this", "instances": [{"index_key": 0, "status": "tainted" if tainted else "ready", "attributes": {"id": m.SERVICE_ARN if exact else "arn:aws:ecs:eu-west-2:218549829565:service/portyard/web"}}]},
             {"module": "module.godiffy.module.application", "type": "aws_ecs_task_definition", "name": "web", "instances": [{"index_key": digest, "attributes": {"arn": definition}}]},
         ], "outputs": {"deployment": {"value": {"account_id": m.ACCOUNT, "region": m.REGION, "environment": "dev", "image_digest": digest, **network}}}}
-        service = {"createdAt": datetime.now(timezone.utc).isoformat() if recent else "2000-01-01T00:00:00+00:00", "serviceArn": m.SERVICE_ARN, "clusterArn": m.CLUSTER_ARN, "status": "ACTIVE", "tags": [{"key": key, "value": value} for key, value in m.TAGS.items()] if owned else [], "desiredCount": 1, "runningCount": 1, "pendingCount": 0, "taskDefinition": definition, "launchType": "FARGATE", "enableExecuteCommand": False, "deployments": [{"status": "PRIMARY", "rolloutState": "COMPLETED"}], "networkConfiguration": {"awsvpcConfiguration": {"assignPublicIp": "DISABLED" if private else "ENABLED", "subnets": network["task_subnet_ids"], "securityGroups": [network["task_security_group"]]}}, "loadBalancers": [{"containerName": "web", "containerPort": 3000, "targetGroupArn": f"arn:aws:elasticloadbalancing:{m.REGION}:{m.ACCOUNT}:targetgroup/godiffy-dev-app/fixture"}]}
+        service = {"createdAt": m.APPROVED_CREATION.isoformat() if original else "2000-01-01T00:00:00+00:00", "serviceArn": m.SERVICE_ARN, "clusterArn": m.CLUSTER_ARN, "status": "ACTIVE", "tags": [{"key": key, "value": value} for key, value in m.TAGS.items()] if owned else [], "desiredCount": 1, "runningCount": 1, "pendingCount": 0, "taskDefinition": definition, "launchType": "FARGATE", "enableExecuteCommand": False, "deployments": [{"status": "PRIMARY", "rolloutState": "COMPLETED"}], "networkConfiguration": {"awsvpcConfiguration": {"assignPublicIp": "DISABLED" if private else "ENABLED", "subnets": network["task_subnet_ids"], "securityGroups": [network["task_security_group"]]}}, "loadBalancers": [{"containerName": "web", "containerPort": 3000, "targetGroupArn": f"arn:aws:elasticloadbalancing:{m.REGION}:{m.ACCOUNT}:targetgroup/godiffy-dev-app/fixture"}]}
         task = {"group": f"service:{m.SERVICE}", "taskDefinitionArn": definition, "lastStatus": "RUNNING", "healthStatus": "HEALTHY", "containers": [{"name": "web", "imageDigest": digest if image else "sha256:" + "b" * 64}], "attachments": [{"details": [{"name": "networkInterfaceId", "value": "eni-fixture"}]}]}
         responses = [
             {"Account": m.ACCOUNT, "Arn": f"arn:aws:sts::{m.ACCOUNT}:assumed-role/" + ("cloudpay-demo-github-actions/test" if actions else "AWSReservedSSO_PortyardAdministrator_fixture/michael")},
@@ -229,7 +229,7 @@ class HealthyServiceRepairTests(unittest.TestCase):
             {"TargetHealthDescriptions": [{"Target": {"Id": "10.42.10.10"}, "TargetHealth": {"State": "healthy" if healthy else "unhealthy"}}]},
         ]
         with patch.object(m, "read", return_value=state), patch.object(m, "aws", side_effect=responses), patch.object(m.subprocess, "run") as mutate:
-            if all((tainted, recent, owned, image, private, healthy, actions, exact)):
+            if all((tainted, original, owned, image, private, healthy, actions, exact)):
                 m.main(digest)
                 mutate.assert_called_once_with(["terraform", "-chdir=terraform/environments/dev", "untaint", m.ADDRESS], check=True, timeout=120)
             else:
@@ -240,6 +240,6 @@ class HealthyServiceRepairTests(unittest.TestCase):
     def test_only_verified_exact_healthy_failed_read_service_is_retained(self):
         self.run_repair()
 
-    def test_refuses_ordinary_old_unowned_public_wrong_image_or_unhealthy_service(self):
-        for key in ("tainted", "recent", "owned", "image", "private", "healthy", "actions", "exact"):
+    def test_refuses_ordinary_other_creation_unowned_public_wrong_image_or_unhealthy_service(self):
+        for key in ("tainted", "original", "owned", "image", "private", "healthy", "actions", "exact"):
             self.run_repair(**{key: False})

@@ -70,9 +70,14 @@ CI bootstrap `PassRole`; Actions also denied the retained role's trust/inline po
 created the service but its provider health waiter lacked `ecs:ListServiceDeployments`.
 AWS reports **one running task, completed rollout, no failed tasks**, while Terraform
 marked the service tainted. The user separately approved a guarded Actions-only
-retention repair after verifying exact tags, recent creation, image, private network
+retention repair after verifying exact tags, original creation, image, private network
 and healthy ALB target. Only failed-read state taint is cleared; deletion/replacement
-remains forbidden. The narrowly scoped deployment metadata reads are being added.
+remains forbidden. The narrowly scoped deployment metadata reads were added.
+The repair first stopped unchanged when its six-hour freshness guard expired during
+the pause ([run 37686112370](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37686112370)).
+The user then explicitly approved pinning it to the original creation timestamp
+**2026-10-07 14:27:37.018 UTC**, rather than broadening the age window. All other
+identity/image/private-network/health guards remain required.
 
 The implementation and status/runbooks were committed and pushed to `master` in
 `7809dabb87812ae9da125003a5d7d8df826c9bc9`. GitHub
