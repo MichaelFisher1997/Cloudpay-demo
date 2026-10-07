@@ -1,8 +1,9 @@
 # London cost worksheet — 7 October 2026
 
-**Only the state bucket is currently deployed**, normally well below $1/month for
-small state files/requests. Figures below describe the proposed platform, not a
-current bill or authorization to create it. USD, 730 hours/month, on-demand, no
+DEV foundations are being deployed through Actions; actual inventory/status is in
+[dev-deployment.md](dev-deployment.md). The retained state bucket is normally well
+below $1/month for small state files/requests. Figures below estimate the approved
+small DEV design, not a measured bill or spending cap. USD, 730 hours/month, on-demand, no
 taxes, discounts, credits or free tiers assumed.
 
 | Component and official rate | Dev/month | Prod/month |
@@ -14,9 +15,9 @@ taxes, discounts, credits or free tiers assumed.
 | RDS PostgreSQL: micro Single-AZ $0.018/hour; small Multi-AZ $0.072/hour | $13.14 | $52.56 |
 | RDS gp3: $0.133/GB-month Single-AZ / $0.266 Multi-AZ; 20 / 50 provisioned | $2.66 | $13.30 |
 | Four interface endpoints: $0.011/endpoint-AZ-hour; four / eight placements | $32.12 | $64.24 |
-| Three Secrets Manager secrets: $0.40/secret-month | $1.20 | $1.20 |
+| Secrets Manager: $0.40/secret-month; four DEV (including disposable smoke fixture) / three prod | $1.60 | $1.20 |
 | **Illustrative** average 10 GB retained ECR images: $0.10/GB-month | $1.00 | $1.00 |
-| **Illustrative subtotal, not a ceiling or exact forecast** | **$93.23** | **$185.77** |
+| **Illustrative subtotal, not a ceiling or exact forecast** | **$93.63** | **$185.77** |
 
 The full foundations themselves incur ALB, RDS and endpoint charges before any
 service is activated. Do not assume "no ECS task" means "no bill". The illustration

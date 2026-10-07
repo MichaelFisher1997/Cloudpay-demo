@@ -171,6 +171,20 @@ async function main() {
     const otherLogin = await login(otherEmail, fixture.otherPassword);
     expectStatus(otherLogin, [200], "other login");
     const otherSession = cookie(otherLogin);
+    let rateLimited = false;
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const denied = await login(
+        ownerEmail,
+        randomBytes(32).toString("base64url"),
+      );
+      assert([400, 401, 403, 429].includes(denied.status));
+      if (denied.status === 429) {
+        rateLimited = true;
+        break;
+      }
+    }
+    assert(rateLimited);
+    record("database-backed login rate limit", 429);
     if (process.env.SMOKE_REPLACE_TASK === "true") {
       step = "authorized single-task recovery";
       const command = Bun.spawn(
@@ -333,6 +347,13 @@ async function main() {
       string(object(await json(download)).url),
       c.bucket,
       c.region,
+    );
+    const privateObject = new URL(signedDownload);
+    privateObject.search = "";
+    expectStatus(
+      await fetch(privateObject, { method: "HEAD", redirect: "manual" }),
+      [403],
+      "anonymous image object HEAD denied",
     );
     const getPreflight = await fetch(signedDownload, {
       method: "OPTIONS",

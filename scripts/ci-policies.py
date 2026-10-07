@@ -113,6 +113,10 @@ def generate(master_arn=None, bootstrap_pass=True, scaling_arn=None):
         "migration": document(statement("MigrationSecretOnly", "secretsmanager:GetSecretValue", migration)),
         "bootstrap": document(statement("OnlyInitializationSecretReads", "secretsmanager:GetSecretValue", [runtime, migration] + ([master_arn] if master_arn else [])), statement("OnlyInitializationSecretWrites", "secretsmanager:PutSecretValue", [runtime, migration])),
     }
+    if not bootstrap_pass:
+        # Human-controlled boundary closes the indirect CI route permanently:
+        # CI cannot restore master access by re-enabling the task trust/policy.
+        boundaries["bootstrap"] = document(statement("RetiredInitializationCannotReadOrWriteSecrets", ["secretsmanager:GetSecretValue", "secretsmanager:PutSecretValue"], "*", effect="Deny"))
     result = {f"ci-{key}": value for key, value in {"network": network, "data": data, "services": services, "control": control, "iam": iam}.items()}
     result.update({f"boundary-{key}": value for key, value in boundaries.items()})
     for name, policy in result.items():

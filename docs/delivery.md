@@ -68,6 +68,10 @@ access; this authorization path still requires actual AWS verification.
 - HTTP test passwords are generated inside the runner and saved only in a
   dedicated disposable fixture secret. CI cannot read application, migration or
   RDS master secrets; controlled bootstrap indirect authority is removed afterward.
+- Human retirement additionally sets the bootstrap boundary to explicit secret
+  denials and removes CI bootstrap `PassRole`. CI cannot restore master access by
+  editing the retained role's trust or inline policy. This is independent of the
+  Terraform in-place trust/policy denials.
 
 Terraform remains the task-definition/service owner. Actions retains prior image
 digests from state and creates new digest-keyed definitions without deleting old

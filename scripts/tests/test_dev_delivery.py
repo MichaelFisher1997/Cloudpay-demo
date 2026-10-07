@@ -17,6 +17,7 @@ def load(filename):
 audit_module = load("check-dev-plan.py")
 policies_module = load("ci-policies.py")
 repair_module = load("repair-dev-log-state.py")
+verify_module = load("verify-dev.py")
 
 
 class DevDeliveryTests(unittest.TestCase):
@@ -104,6 +105,9 @@ class DevDeliveryTests(unittest.TestCase):
         policy = policies_module.generate(bootstrap_pass=False)["ci-iam"]
         stmt = next(item for item in policy["Statement"] if item["Action"] == "iam:PassRole")
         self.assertNotIn("arn:aws:iam::218549829565:role/godiffy-dev-bootstrap", stmt["Resource"])
+        retired = policies_module.generate(bootstrap_pass=False)["boundary-bootstrap"]["Statement"]
+        self.assertTrue(all(item["Effect"] == "Deny" for item in retired))
+        self.assertEqual(retired[0]["Resource"], "*")
 
     def test_generated_policies_are_current(self):
         for name, policy in policies_module.generate().items():
@@ -138,3 +142,11 @@ class EmptyLogRepairTests(unittest.TestCase):
     def test_refuses_ordinary_nonempty_unowned_or_old_resource(self):
         for options in ({"tainted": False}, {"streams": True}, {"owned": False}, {"recent": False}):
             self.run_repair(**options)
+
+
+class LogSampleTests(unittest.TestCase):
+    def test_detects_credentials_sql_and_signed_urls_without_printing_them(self):
+        for message in ("password: disposable", "auth_secret=fixture", "https://example.invalid/?X-Amz-Signature=fixture", "ALTER ROLE fixture PASSWORD 'disposable';", "ASIA1234567890123456"):
+            self.assertIsNotNone(verify_module.SECRET_PATTERN.search(message))
+        for message in ("Schema migrated", "Request failed", "Runtime role denied master and migration secrets: PASS"):
+            self.assertIsNone(verify_module.SECRET_PATTERN.search(message))

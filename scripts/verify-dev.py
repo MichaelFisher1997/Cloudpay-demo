@@ -6,6 +6,7 @@ Task replacement stops only a running task belonging to the exact DEV web servic
 import argparse
 from datetime import datetime, timedelta, timezone
 import json
+import re
 from pathlib import Path
 import subprocess
 
@@ -14,6 +15,7 @@ REGION = "eu-west-2"
 CLUSTER = "godiffy-dev-cluster"
 SERVICE = "godiffy-dev-web"
 TAGS = {"Project": "godiffy", "Environment": "dev", "ManagedBy": "terraform", "Purpose": "cloudpay-technical-assessment"}
+SECRET_PATTERN = re.compile(r"x-amz-(?:signature|security-token)=|\b(?:AKIA|ASIA)[A-Z0-9]{16}\b|\bPASSWORD\s+'|\b(?:password|auth_secret|secret_access_key|aws_session_token)[\"']?\s*[:=]\s*\S+", re.IGNORECASE)
 
 
 def aws(*args, denied=False):
@@ -50,6 +52,10 @@ def main(outputs, replace):
         return values[0]
 
     task = tasks()
+    require(len(task["containers"]) == 1 and task["containers"][0]["imageDigest"] == d["image_digest"], "Unexpected running image digest")
+    results["private_immutable_ecr_pull"] = "pass"
+    scan = aws("ecr", "describe-image-scan-findings", "--repository-name", "godiffy-dev-application", "--image-id", f"imageDigest={d['image_digest']}")
+    results["ecr_scan"] = {"status": scan["imageScanStatus"]["status"], "severity_counts": scan.get("imageScanFindings", {}).get("findingSeverityCounts", {})}
     enis = [detail["value"] for attachment in task["attachments"] for detail in attachment["details"] if detail["name"] == "networkInterfaceId"]
     require(len(enis) == 1, "Expected one task ENI")
     eni = aws("ec2", "describe-network-interfaces", "--network-interface-ids", enis[0])["NetworkInterfaces"][0]
@@ -67,6 +73,11 @@ def main(outputs, replace):
         if "tasks-" in name or "database-isolated" in name:
             require(not any(route.get("DestinationCidrBlock") == "0.0.0.0/0" or route.get("NatGatewayId") for route in table["Routes"]), "Unexpected private internet route")
     results["private_endpoint_only_task"] = "pass"
+    target_groups = aws("elbv2", "describe-target-groups", "--names", "godiffy-dev-app")["TargetGroups"]
+    require(len(target_groups) == 1 and target_groups[0]["VpcId"] == vpc, "Unexpected ALB target group")
+    health = aws("elbv2", "describe-target-health", "--target-group-arn", target_groups[0]["TargetGroupArn"])["TargetHealthDescriptions"]
+    require(len(health) == 1 and health[0]["Target"]["Id"] == eni["PrivateIpAddress"] and health[0]["TargetHealth"]["State"] == "healthy", "ALB target unhealthy/unexpected")
+    results["alb_healthy_private_target"] = "pass"
 
     db = aws("rds", "describe-db-instances", "--db-instance-identifier", "godiffy-dev-postgres")["DBInstances"][0]
     require(db["DBInstanceStatus"] == "available" and db["EngineVersion"] == "17.9", "DB not ready/pinned")
@@ -78,6 +89,16 @@ def main(outputs, replace):
     for kind in ("runtime", "migration", "master"):
         aws("secretsmanager", "get-secret-value", "--secret-id", d[f"{kind}_secret_arn"], denied=True)
     results["ci_denied_application_and_master_secrets"] = "pass"
+    for kind in ("execution", "runtime", "migration", "bootstrap"):
+        role = aws("iam", "get-role", "--role-name", f"godiffy-dev-{kind}")["Role"]
+        boundary_arn = f"arn:aws:iam::{ACCOUNT}:policy/godiffy-dev-boundary-{kind}"
+        require(role["PermissionsBoundary"]["PermissionsBoundaryArn"] == boundary_arn, "Wrong task boundary")
+        if kind == "bootstrap":
+            require(all(statement["Effect"] == "Deny" for statement in role["AssumeRolePolicyDocument"]["Statement"]), "Bootstrap trust not retired")
+            metadata = aws("iam", "get-policy", "--policy-arn", boundary_arn)["Policy"]
+            boundary = aws("iam", "get-policy-version", "--policy-arn", boundary_arn, "--version-id", metadata["DefaultVersionId"])["PolicyVersion"]["Document"]
+            require(all(statement["Effect"] == "Deny" for statement in boundary["Statement"]), "Bootstrap boundary not retired")
+    results["four_boundaries_and_retired_bootstrap"] = "pass"
 
     bucket = d["image_bucket_name"]
     require(bucket == f"godiffy-dev-images-{ACCOUNT}-{REGION}", "Wrong image bucket")
@@ -94,10 +115,21 @@ def main(outputs, replace):
     require(any(stream.get("lastEventTimestamp") for stream in streams), "No application/job logs")
     # Presence/retention only: messages are never dumped by this workflow.
     results["logs_present_and_bounded"] = "pass"
+    # Bounded sample, checked in memory; never print or persist log messages.
+    sampled = 0
+    for group_name in (d["log_group_name"], "/aws/rds/instance/godiffy-dev-postgres/postgresql"):
+        sample_streams = aws("logs", "describe-log-streams", "--log-group-name", group_name, "--order-by", "LastEventTime", "--descending", "--limit", "10", "--no-paginate")["logStreams"]
+        for stream in sample_streams:
+            messages = aws("logs", "get-log-events", "--log-group-name", group_name, "--log-stream-name", stream["logStreamName"], "--limit", "100", "--no-paginate")["events"]
+            require(not any(SECRET_PATTERN.search(event["message"]) for event in messages), "Potential secret indicator in log sample; inspect securely")
+            sampled += len(messages)
+    results["sampled_logs_no_secret_indicators"] = {"status": "pass", "events": sampled}
     alarm_names = [f"godiffy-dev-{name}" for name in ("alb-target-errors", "alb-errors", "alb-unhealthy-targets", "database-cpu", "database-storage", "database-connections", "service-memory", "service-cpu", "service-healthy-targets")]
     alarms = aws("cloudwatch", "describe-alarms", "--alarm-names", *alarm_names)["MetricAlarms"]
     require(len(alarms) == 9 and all(alarm["ActionsEnabled"] and alarm["AlarmActions"] == [d["alarm_topic_arn"]] for alarm in alarms), "Alarm routing mismatch")
     results["nine_alarms_routed_to_dev_topic"] = "pass"
+    subscribers = aws("sns", "list-subscriptions-by-topic", "--topic-arn", d["alarm_topic_arn"])["Subscriptions"]
+    results["confirmed_alarm_subscribers"] = sum(subscription["SubscriptionArn"] != "PendingConfirmation" for subscription in subscribers)
     target = aws("application-autoscaling", "describe-scalable-targets", "--service-namespace", "ecs", "--resource-ids", f"service/{CLUSTER}/{SERVICE}")["ScalableTargets"]
     require(len(target) == 1 and target[0]["MinCapacity"] == 1 and target[0]["MaxCapacity"] == 2, "Scaling bounds mismatch")
     results["scaling_bounds_one_to_two"] = "pass"
