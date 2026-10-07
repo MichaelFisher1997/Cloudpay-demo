@@ -9,10 +9,23 @@
         "ecs:DescribeClusters",
         "ecs:UpdateClusterSettings",
         "ecs:TagResource",
-        "ecs:ListTagsForResource",
-        "ecs:ListTasks"
+        "ecs:ListTagsForResource"
       ],
       "Resource": "arn:aws:ecs:eu-west-2:218549829565:cluster/godiffy-dev-cluster"
+    },
+    {
+      "Sid": "ListOnlyDevClusterTasks",
+      "Effect": "Allow",
+      "Action": "ecs:ListTasks",
+      "Resource": "*",
+      "Condition": {
+        "ArnEquals": {
+          "ecs:cluster": "arn:aws:ecs:eu-west-2:218549829565:cluster/godiffy-dev-cluster"
+        },
+        "StringEquals": {
+          "aws:RequestedRegion": "eu-west-2"
+        }
+      }
     },
     {
       "Sid": "OnlyTaggedDevTaskDefinitions",
@@ -29,14 +42,24 @@
       }
     },
     {
-      "Sid": "OnlyDevTaskDefinitionMetadata",
+      "Sid": "OnlyDevTaskDefinitionTags",
       "Effect": "Allow",
       "Action": [
-        "ecs:DescribeTaskDefinition",
         "ecs:ListTagsForResource",
         "ecs:TagResource"
       ],
       "Resource": "arn:aws:ecs:eu-west-2:218549829565:task-definition/godiffy-dev-*:*"
+    },
+    {
+      "Sid": "RegionalTaskDefinitionMetadata",
+      "Effect": "Allow",
+      "Action": "ecs:DescribeTaskDefinition",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "eu-west-2"
+        }
+      }
     },
     {
       "Sid": "OnlyDevService",

@@ -99,9 +99,12 @@ def generate(master_arn=None, bootstrap_pass=True, scaling_arn=None):
         statement("ExactlyApprovedMissingServiceRoles", "iam:CreateServiceLinkedRole", [f"arn:aws:iam::{ACCOUNT}:role/aws-service-role/rds.amazonaws.com/AWSServiceRoleForRDS", f"arn:aws:iam::{ACCOUNT}:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService"], {"StringEquals": {"iam:AWSServiceName": ["rds.amazonaws.com", "ecs.application-autoscaling.amazonaws.com"]}}),
     )
     control = document(
-        statement("OnlyDevCluster", ["ecs:CreateCluster", "ecs:DescribeClusters", "ecs:UpdateClusterSettings", "ecs:TagResource", "ecs:ListTagsForResource", "ecs:ListTasks"], cluster),
+        statement("OnlyDevCluster", ["ecs:CreateCluster", "ecs:DescribeClusters", "ecs:UpdateClusterSettings", "ecs:TagResource", "ecs:ListTagsForResource"], cluster),
+        statement("ListOnlyDevClusterTasks", "ecs:ListTasks", "*", {"ArnEquals": {"ecs:cluster": cluster}, "StringEquals": {"aws:RequestedRegion": REGION}}),
         statement("OnlyTaggedDevTaskDefinitions", "ecs:RegisterTaskDefinition", task_definitions, requested),
-        statement("OnlyDevTaskDefinitionMetadata", ["ecs:DescribeTaskDefinition", "ecs:ListTagsForResource", "ecs:TagResource"], task_definitions),
+        statement("OnlyDevTaskDefinitionTags", ["ecs:ListTagsForResource", "ecs:TagResource"], task_definitions),
+        # ECS does not offer resource-level authorization for this read API.
+        statement("RegionalTaskDefinitionMetadata", "ecs:DescribeTaskDefinition", "*", regional),
         statement("OnlyDevService", ["ecs:CreateService", "ecs:UpdateService", "ecs:DescribeServices", "ecs:ListTagsForResource", "ecs:TagResource"], service),
         statement("PrivateDevJobs", "ecs:RunTask", task_definitions, {"ArnEquals": {"ecs:cluster": cluster}}),
         statement("OnlyDevTaskStatusAndRecovery", ["ecs:DescribeTasks", "ecs:StopTask"], task_resources),

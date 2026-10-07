@@ -118,6 +118,14 @@ class DevDeliveryTests(unittest.TestCase):
             if name not in ("boundary-bootstrap", "ci-iam", "ci-control"):
                 self.assertEqual(committed, policy)
 
+    def test_ecs_read_apis_use_supported_cluster_conditions(self):
+        statements = {item["Sid"]: item for item in policies_module.generate()["ci-control"]["Statement"]}
+        listed = statements["ListOnlyDevClusterTasks"]
+        self.assertEqual(listed["Resource"], "*")
+        self.assertEqual(listed["Condition"]["ArnEquals"]["ecs:cluster"], "arn:aws:ecs:eu-west-2:218549829565:cluster/godiffy-dev-cluster")
+        self.assertEqual(statements["RegionalTaskDefinitionMetadata"]["Action"], "ecs:DescribeTaskDefinition")
+        self.assertEqual(statements["RegionalTaskDefinitionMetadata"]["Resource"], "*")
+
 
 class EmptyLogRepairTests(unittest.TestCase):
     def run_repair(self, *, tainted=True, streams=False, owned=True, recent=True):
