@@ -83,8 +83,8 @@ run "dev_service_immutable_private" {
       !one(aws_ecs_service.this[0].network_configuration).assign_public_ip &&
       aws_ecs_service.this[0].desired_count == 1 &&
       one(aws_ecs_service.this[0].deployment_circuit_breaker).rollback &&
-      jsondecode(aws_ecs_task_definition.web[0].container_definitions)[0].readonlyRootFilesystem &&
-      strcontains(jsondecode(aws_ecs_task_definition.web[0].container_definitions)[0].image, "@sha256:") &&
+      jsondecode(aws_ecs_task_definition.web[var.release.image_digest].container_definitions)[0].readonlyRootFilesystem &&
+      strcontains(jsondecode(aws_ecs_task_definition.web[var.release.image_digest].container_definitions)[0].image, "@sha256:") &&
       aws_appautoscaling_target.this[0].min_capacity == 1
     )
     error_message = "Dev tasks must remain private, non-root/read-only, rollback-enabled and digest-pinned."
@@ -106,12 +106,30 @@ run "bootstrap_restricted_and_retained" {
   }
   assert {
     condition = (
-      length(aws_iam_role.bootstrap) == 1 && contains(keys(aws_ecs_task_definition.job), "bootstrap") &&
+      length(aws_iam_role.bootstrap) == 1 && contains(keys(aws_ecs_task_definition.job), "${var.release.image_digest}/bootstrap") &&
       jsondecode(aws_iam_role.bootstrap[0].assume_role_policy).Statement[0].Effect == "Deny" &&
       jsondecode(aws_iam_role_policy.bootstrap[0].policy).Statement[0].Effect == "Deny" &&
       aws_iam_role.runtime.permissions_boundary == "arn:aws:iam::218549829565:policy/godiffy-dev-boundary-runtime"
     )
     error_message = "Bootstrap retirement must restrict privileges/trust in place, never delete the role or definitions."
+  }
+}
+run "new_image_retains_previous_definitions" {
+  command = plan
+  variables {
+    release = {
+      image_digest           = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      retained_image_digests = ["sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]
+      bootstrap_retained     = true, service_enabled = true, database_ready = true
+    }
+  }
+  assert {
+    condition = (
+      length(aws_ecs_task_definition.web) == 2 && length(aws_ecs_task_definition.job) == 6 &&
+      contains(keys(aws_ecs_task_definition.web), "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") &&
+      contains(keys(aws_ecs_task_definition.web), var.release.image_digest)
+    )
+    error_message = "New images must retain earlier immutable definitions without deletion."
   }
 }
 run "reject_service_before_migrations" {

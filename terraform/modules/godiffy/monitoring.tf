@@ -23,7 +23,11 @@ resource "aws_sns_topic_policy" "alarms" {
         Sid       = "DenyInsecureTransport"
         Effect    = "Deny"
         Principal = "*"
-        Action    = "sns:*"
+        # SNS topic policies accept only topic-level actions, not all SNS APIs.
+        Action = [
+          "sns:Publish", "sns:Subscribe", "sns:GetTopicAttributes", "sns:SetTopicAttributes",
+          "sns:AddPermission", "sns:RemovePermission", "sns:DeleteTopic", "sns:ListSubscriptionsByTopic",
+        ]
         Resource  = aws_sns_topic.alarms.arn
         Condition = { Bool = { "aws:SecureTransport" = "false", "aws:PrincipalIsAWSService" = "false" } }
       },

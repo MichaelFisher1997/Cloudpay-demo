@@ -1,0 +1,68 @@
+name: Godiffy DEV real AWS verification
+on:
+  workflow_dispatch:
+    inputs:
+      replace_task:
+        type: boolean
+        default: false
+        description: Stop only the single DEV web task and verify recovery with saved sessions
+permissions:
+  contents: read
+concurrency:
+  group: godiffy-dev-deployment
+  cancel-in-progress: false
+jobs:
+  verify:
+    if: github.repository == 'MichaelFisher1997/Cloudpay-demo' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: eu-west-2
+      AWS_PAGER: ""
+      TF_IN_AUTOMATION: "true"
+      TF_WORKSPACE: default
+      SMOKE_REPLACE_TASK: ${{ inputs.replace_task }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: 1.16.5
+          terraform_wrapper: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.4.2
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          aws-region: eu-west-2
+          role-to-assume: arn:aws:iam::218549829565:role/cloudpay-demo-github-actions
+          allowed-account-ids: "218549829565"
+          role-duration-seconds: 3600
+          unset-current-credentials: true
+      - name: Read non-secret DEV deployment identifiers
+        run: |
+          umask 077
+          terraform -chdir=terraform/environments/dev init -input=false -lockfile=readonly -backend-config=backend.hcl
+          terraform -chdir=terraform/environments/dev output -json > terraform/environments/dev/deployment.json
+          python3 - <<'PY'
+          import json,os
+          d=json.load(open('terraform/environments/dev/deployment.json'))
+          v=d['deployment']['value']
+          with open(os.environ['GITHUB_ENV'],'a') as f:
+              for k,value in dict(APP_URL=v['application_origin'],IMAGE_BUCKET=v['image_bucket_name'],SMOKE_SECRET_ARN=d['smoke_secret_arn']['value']).items():
+                  f.write(k+'='+value+'\n')
+          PY
+      - name: Inventory, private routes/endpoints, CI denials, logs, metrics and alarms
+        run: |
+          python3 scripts/verify-dev.py | tee /tmp/godiffy-inventory.json
+          cat /tmp/godiffy-inventory.json >> "$GITHUB_STEP_SUMMARY"
+      - name: HTTP and direct S3 smoke; optional authorized task recovery
+        working-directory: app
+        run: |
+          bun install --frozen-lockfile
+          bun run smoke:aws
+          cat /tmp/godiffyAWSsmoke.json >> "$GITHUB_STEP_SUMMARY"

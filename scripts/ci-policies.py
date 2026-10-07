@@ -36,6 +36,8 @@ def generate(master_arn=None, bootstrap_pass=True, scaling_arn=None):
         statement("RegionalDiscovery", [f"ec2:{name}" for name in ["DescribeVpcs", "DescribeVpcAttribute", "DescribeSubnets", "DescribeRouteTables", "DescribeInternetGateways", "DescribeSecurityGroups", "DescribeSecurityGroupRules", "DescribeVpcEndpoints", "DescribeVpcEndpointServices", "DescribePrefixLists", "DescribeManagedPrefixLists", "DescribeAvailabilityZones", "DescribeTags", "DescribeNetworkInterfaces"]], "*", regional),
         statement("CreateTaggedDevNetwork", [f"ec2:{name}" for name in ec2_creates[:6]], ec2_resources, requested),
         statement("TaggedDevParents", ["ec2:CreateSubnet", "ec2:CreateRouteTable", "ec2:CreateSecurityGroup", "ec2:CreateVpcEndpoint"], f"arn:aws:ec2:{REGION}:{ACCOUNT}:vpc/*", existing),
+        statement("OnlyTaggedDevEndpointAttachments", "ec2:CreateVpcEndpoint", [f"arn:aws:ec2:{REGION}:{ACCOUNT}:{kind}/*" for kind in ("subnet", "security-group", "route-table")], existing),
+        statement("CreateTaggedDevSecurityRules", ["ec2:AuthorizeSecurityGroupIngress", "ec2:AuthorizeSecurityGroupEgress"], f"arn:aws:ec2:{REGION}:{ACCOUNT}:security-group-rule/*", requested),
         statement("ModifyOnlyDevNetwork", ["ec2:ModifyVpcAttribute", "ec2:AttachInternetGateway", "ec2:AssociateRouteTable", "ec2:CreateRoute", "ec2:AuthorizeSecurityGroupIngress", "ec2:AuthorizeSecurityGroupEgress", "ec2:RevokeSecurityGroupIngress", "ec2:RevokeSecurityGroupEgress", "ec2:ModifyVpcEndpoint"], ec2_resources, existing),
         statement("CreateTimeNetworkTags", "ec2:CreateTags", ec2_resources, {"StringEquals": {"ec2:CreateAction": ec2_creates}}),
         statement("MaintainDevNetworkTags", "ec2:CreateTags", ec2_resources, existing),
@@ -68,7 +70,7 @@ def generate(master_arn=None, bootstrap_pass=True, scaling_arn=None):
         statement("ELBReadOnlyDiscovery", [f"elasticloadbalancing:{name}" for name in ["DescribeLoadBalancers", "DescribeLoadBalancerAttributes", "DescribeTargetGroups", "DescribeTargetGroupAttributes", "DescribeListeners", "DescribeListenerAttributes", "DescribeTags", "DescribeTargetHealth"]], "*", regional),
         statement("CreateTaggedDevALB", ["elasticloadbalancing:CreateLoadBalancer", "elasticloadbalancing:CreateTargetGroup", "elasticloadbalancing:CreateListener"], lb_resources, requested),
         statement("DevLoadBalancerUpdates", ["elasticloadbalancing:ModifyLoadBalancerAttributes", "elasticloadbalancing:ModifyTargetGroupAttributes", "elasticloadbalancing:ModifyTargetGroup", "elasticloadbalancing:ModifyListener", "elasticloadbalancing:AddTags"], lb_resources),
-        statement("OnlyDevLogs", ["logs:CreateLogGroup", "logs:PutRetentionPolicy", "logs:TagResource", "logs:ListTagsForResource", "logs:ListTagsLogGroup", "logs:GetLogEvents", "logs:FilterLogEvents", "logs:DescribeLogStreams"], logs),
+        statement("OnlyDevLogs", ["logs:CreateLogGroup", "logs:PutRetentionPolicy", "logs:TagResource", "logs:ListTagsForResource", "logs:ListTagsLogGroup", "logs:GetLogEvents", "logs:FilterLogEvents", "logs:DescribeLogStreams"], logs + [arn.removesuffix(":*") for arn in logs]),
         statement("RegionalLogDiscovery", "logs:DescribeLogGroups", "*", regional),
         statement("OnlyDevAlarms", ["cloudwatch:PutMetricAlarm", "cloudwatch:DescribeAlarms", "cloudwatch:ListTagsForResource", "cloudwatch:TagResource"], f"arn:aws:cloudwatch:{REGION}:{ACCOUNT}:alarm:{PREFIX}-*"),
         statement("RegionalMetricsRead", ["cloudwatch:GetMetricData", "cloudwatch:GetMetricStatistics", "cloudwatch:ListMetrics"], "*", regional),
@@ -94,7 +96,7 @@ def generate(master_arn=None, bootstrap_pass=True, scaling_arn=None):
         statement("ExactlyApprovedMissingServiceRoles", "iam:CreateServiceLinkedRole", [f"arn:aws:iam::{ACCOUNT}:role/aws-service-role/rds.amazonaws.com/AWSServiceRoleForRDS", f"arn:aws:iam::{ACCOUNT}:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService"], {"StringEquals": {"iam:AWSServiceName": ["rds.amazonaws.com", "ecs.application-autoscaling.amazonaws.com"]}}),
     )
     control = document(
-        statement("OnlyDevCluster", ["ecs:CreateCluster", "ecs:DescribeClusters", "ecs:UpdateClusterSettings", "ecs:TagResource", "ecs:ListTagsForResource"], cluster),
+        statement("OnlyDevCluster", ["ecs:CreateCluster", "ecs:DescribeClusters", "ecs:UpdateClusterSettings", "ecs:TagResource", "ecs:ListTagsForResource", "ecs:ListTasks"], cluster),
         statement("OnlyTaggedDevTaskDefinitions", "ecs:RegisterTaskDefinition", task_definitions, requested),
         statement("OnlyDevTaskDefinitionMetadata", ["ecs:DescribeTaskDefinition", "ecs:ListTagsForResource", "ecs:TagResource"], task_definitions),
         statement("OnlyDevService", ["ecs:CreateService", "ecs:UpdateService", "ecs:DescribeServices", "ecs:ListTagsForResource", "ecs:TagResource"], service),

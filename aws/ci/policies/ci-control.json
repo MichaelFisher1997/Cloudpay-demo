@@ -9,7 +9,8 @@
         "ecs:DescribeClusters",
         "ecs:UpdateClusterSettings",
         "ecs:TagResource",
-        "ecs:ListTagsForResource"
+        "ecs:ListTagsForResource",
+        "ecs:ListTasks"
       ],
       "Resource": "arn:aws:ecs:eu-west-2:218549829565:cluster/godiffy-dev-cluster"
     },

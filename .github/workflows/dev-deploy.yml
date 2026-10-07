@@ -18,6 +18,10 @@ on:
       expected_fingerprint:
         type: string
         description: Required for apply; copy from reviewed plan run
+      repair_failed_log_group:
+        type: boolean
+        default: false
+        description: Explicit failed-new empty DB-log read repair only; never deletes resources
 
 permissions:
   contents: read
@@ -83,9 +87,23 @@ jobs:
         run: |
           terraform -chdir=terraform/environments/dev init -input=false -lockfile=readonly -backend-config=backend.hcl
           terraform -chdir=terraform/environments/dev validate
+      - name: Explicitly repair failed-new empty log group state without deletion
+        if: inputs.repair_failed_log_group && inputs.phase == 'foundations'
+        run: python3 scripts/repair-dev-log-state.py
       - name: Saved DEV plan
         run: |
           umask 077
+          terraform -chdir=terraform/environments/dev output -json > terraform/environments/dev/deployment.json
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          d=json.load(open('terraform/environments/dev/deployment.json')).get('deployment',{}).get('value',{})
+          path=Path('terraform/environments/dev/ci-release.local.tfvars.json')
+          v=json.loads(path.read_text())
+          if os.environ['PHASE']!='foundations':
+              v['release']['retained_image_digests']=d.get('retained_image_digests',[])
+          path.write_text(json.dumps(v))
+          PY
           terraform -chdir=terraform/environments/dev plan -input=false -no-color -lock-timeout=120s -var-file=ci-release.local.tfvars.json -out=dev.tfplan
       - name: Fail-closed scope and plan review fingerprint
         run: |

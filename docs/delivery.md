@@ -69,9 +69,10 @@ access; this authorization path still requires actual AWS verification.
   dedicated disposable fixture secret. CI cannot read application, migration or
   RDS master secrets; controlled bootstrap indirect authority is removed afterward.
 
-Terraform remains the task-definition/service owner. Under the current strict
-no-deletion approval, future immutable task-definition replacements fail closed
-and need separate review; `skip_destroy` does not bypass the plan deletion guard.
+Terraform remains the task-definition/service owner. Actions retains prior image
+digests from state and creates new digest-keyed definitions without deleting old
+revisions. Changes to existing immutable definitions still fail closed under the
+no-deletion guard; `skip_destroy` is not used to bypass that guard.
 
 | Work | Authentication and authority |
 | --- | --- |

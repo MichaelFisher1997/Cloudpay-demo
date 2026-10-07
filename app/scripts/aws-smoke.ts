@@ -171,6 +171,24 @@ async function main() {
     const otherLogin = await login(otherEmail, fixture.otherPassword);
     expectStatus(otherLogin, [200], "other login");
     const otherSession = cookie(otherLogin);
+    if (process.env.SMOKE_REPLACE_TASK === "true") {
+      step = "authorized single-task recovery";
+      const command = Bun.spawn(
+        [
+          "python3",
+          "../scripts/verify-dev.py",
+          "--replace-task",
+          "--outputs",
+          "../terraform/environments/dev/deployment.json",
+        ],
+        { stdout: "pipe", stderr: "pipe" },
+      );
+      const output = await new Response(command.stdout).text();
+      await new Response(command.stderr).text(); // Discard; never dump SDK errors.
+      assert((await command.exited) === 0);
+      assert(object(JSON.parse(output)).outcome === "pass");
+      record("single-task replaced; saved sessions retained");
+    }
     expectStatus(await app("/api/images/"), [401], "anonymous gallery denied");
     const ownerList = await app("/api/images/", "GET", undefined, ownerSession);
     expectStatus(ownerList, [200], "owner gallery list");

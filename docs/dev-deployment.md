@@ -1,6 +1,6 @@
 # DEV deployment status — 7 October 2026
 
-## Outcome: authorized, GitHub Actions rollout in preparation
+## Outcome: DEV foundations partially created; focused Actions retry prepared
 
 The user approved autonomous **DEV-only** deployment in account `218549829565`,
 region `eu-west-2`, using the existing `portyard` SSO profile and
@@ -29,10 +29,21 @@ retirement restricts its trust/policy in place while retaining the role and task
 definition. Real private DB verification and HTTP/S3 smoke scripts are prepared;
 they have not yet run against AWS.
 
-No Terraform application apply, ECR push, AWS job or application resource mutation
-has occurred yet in the resumed rollout. Nine exact DEV IAM policies and five
-attachments have now been human-bootstrapped; no trust/profile change or alternate credentials were
-introduced. GitHub repository access is independent of this AWS login.
+Nine exact DEV IAM policies and five attachments were human-bootstrapped without
+trust/profile changes or alternate credentials. Commit `b994283` enabled guarded
+Actions-only delivery. Credential-free [validation run 37619760584](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37619760584)
+passed. [Foundation plan 37619787401](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37619787401)
+passed review: **73 additions, 14 exact CI imports, 0 changes, 0 deletions**.
+
+[Apply 37620104649](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37620104649)
+matched its reviewed fingerprint but stopped on log tag-read ARN spelling,
+security-rule/endpoint attachment IAM checks and invalid wildcard SNS topic actions.
+The partial DEV VPC/subnets/routes/security groups, private versioned image bucket,
+three empty secret containers, DB parameter/subnet groups and alarm topic are retained.
+No image, database job or web service has run yet. The retry adds only exact DEV
+permissions and valid SNS topic actions. One failed-new empty DB log group is
+tainted; an explicitly selected Actions repair verifies recent creation, ownership
+and no streams/data before retaining it with `untaint`, not replacing/deleting it.
 
 The implementation and status/runbooks were committed and pushed to `master` in
 `7809dabb87812ae9da125003a5d7d8df826c9bc9`. GitHub
@@ -53,12 +64,12 @@ nix-shell --run 'aws sts get-caller-identity --profile portyard --region eu-west
 Expected account: `218549829565`; expected human role: `PortyardAdministrator`.
 Do not send tokens/passwords in chat, replace the profile or create access keys.
 
-## Actual resources and verification
+## Actual resources and verification (superseded as rollout progresses)
 
 | Required handoff item | Actual status |
 | --- | --- |
-| Deployed resources | Previously approved dedicated state bucket and its five configuration resources only; no new DEV resources in this attempt |
-| Plan/apply counts | Last saved DEV foundation plan: **72 add / 0 change / 0 delete**; no new authenticated plan or apply possible; this attempt applied **0 resources** |
+| Deployed resources | Six approved backend resources plus partial dedicated DEV foundations and exact CI imports; full inventory recorded after convergence |
+| Plan/apply counts | Actions foundation plan **73 add / 0 change / 0 delete / 14 imports**; partial apply failed on narrow API/IAM issues, no resource deletion |
 | DEV ALB URL | Not created; no application URL is available |
 | ECR tag/digest | Local amd64 image built/tested; no ECR repository/image publication yet |
 | ECS service/tasks | Not created; no Fargate job or service execution |
@@ -68,10 +79,10 @@ Do not send tokens/passwords in chat, replace the profile or create access keys.
 | IAM task roles | Planned execution/runtime/migration roles; none created in DEV |
 | GitHub OIDC | Existing provider/trust unchanged; five exact DEV CI scopes and four immutable task boundaries human-bootstrapped |
 | GitHub validation | Run 37607324492 succeeded for commit 7809dab; no AWS deployment step |
-| Real AWS tests in this attempt | Authentication/connectivity preflight only; resource verification is blocked |
+| Real AWS tests in this attempt | SSO/OIDC identity, CI policy validation/bootstrap and partial foundation apply; deployed app path not yet tested |
 | Earlier blocker | SSO expiry resolved by the user; intermittent AWS API read timeouts were handled by bounded, idempotent bootstrap retries |
 | Still unverified | Entire deployed DEV path, private ECR pull, RDS master privileges/TLS, real S3 semantics, ALB health, logs/metrics, alarms, task replacement and OIDC deployment |
-| DEV recurring cost | No new DEV resource cost incurred; proposed always-on small-dev envelope **$100–170/month**, subject to usage; prior state-only footprint normally under $1/month |
+| DEV recurring cost | Partial foundations now incur small usage charges; full small-dev envelope **$100–170/month**, subject to usage |
 | Compromises | Planned one task/endpoint AZ and Single-AZ DB, HTTP/disposable test accounts, email-string allowlist, pinned Nitro beta, no regional DR |
 | Production | Undeployed; separate roots/plans and HTTPS/redundancy safeguards remain intact |
 | Domain/TLS work | Not performed; no ACM request or Cloudflare/Route 53 change |
@@ -85,7 +96,7 @@ scope-reviewed before apply, not assumed current because they exist locally.
 - [x] Renew SSO; verify exact account and role.
 - [x] Amend bootstrap retirement to restriction without Terraform resource deletion.
 - [x] Validate and bootstrap exact DEV-only OIDC permissions and task boundaries.
-- [ ] Commit/push Actions-only delivery workflows and offline/real-test safeguards.
+- [x] Commit/push Actions-only delivery workflows and offline/real-test safeguards.
 - [ ] Re-plan DEV; reject all deletions/unrelated resources; apply the reviewed saved plan.
 - [ ] Verify network, private endpoints/SGs, versioned private images, RDS and ECR.
 - [ ] Commit/build a linux/amd64 image; publish immutable SHA tag and record digest.
@@ -105,8 +116,8 @@ This approval **does not authorize a routine teardown**. Obtain explicit approva
 for the exact Godiffy DEV resource/data inventory before any destroy. Never destroy
 the bootstrap backend, production or unrelated resources.
 
-At the current blocked stage, there are no newly created DEV resources from this
-attempt to tear down. After deployment, use this sequence under fresh scoped approval:
+Partial DEV foundations already exist; do not abandon them as cost-free or run
+cleanup without approval. Use this sequence under fresh scoped approval:
 
 1. Disable DEV delivery so it cannot recreate resources. Back up the exact DEV
    state securely and record image-version/database retention requirements.

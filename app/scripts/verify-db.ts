@@ -3,7 +3,8 @@ import {
   SecretsManagerClient,
 } from "@aws-sdk/client-secrets-manager";
 import { config } from "../src/server/config";
-import { runtime } from "../src/server/db";
+import { runtime, secret } from "../src/server/db";
+import { Client } from "pg";
 
 async function main() {
   const c = config();
@@ -55,6 +56,31 @@ async function main() {
   } finally {
     await db.end();
   }
+  const credentials = await secret(c.secretArn, c.region);
+  const plaintext = new Client({
+    host: c.host,
+    port: c.port,
+    database: c.database,
+    user: credentials.username,
+    password: credentials.password,
+    ssl: false,
+    connectionTimeoutMillis: 5000,
+  });
+  try {
+    await plaintext.connect();
+    throw new Error("plaintext accepted");
+  } catch (error: unknown) {
+    if (
+      !(error instanceof Error) ||
+      !("code" in error) ||
+      error.code !== "28000" ||
+      !/no encryption|SSL off/i.test(error.message)
+    )
+      throw new Error("plaintext TLS enforcement");
+  } finally {
+    await plaintext.end();
+  }
+  console.log("RDS rejects plaintext PostgreSQL connections: PASS");
   const sm = new SecretsManagerClient({ region: c.region });
   for (const name of ["MASTER_SECRET_ARN", "MIGRATION_SECRET_ARN"] as const) {
     const arn = process.env[name];

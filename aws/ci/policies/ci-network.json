@@ -74,6 +74,39 @@
       }
     },
     {
+      "Sid": "OnlyTaggedDevEndpointAttachments",
+      "Effect": "Allow",
+      "Action": "ec2:CreateVpcEndpoint",
+      "Resource": [
+        "arn:aws:ec2:eu-west-2:218549829565:subnet/*",
+        "arn:aws:ec2:eu-west-2:218549829565:security-group/*",
+        "arn:aws:ec2:eu-west-2:218549829565:route-table/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/Project": "godiffy",
+          "aws:ResourceTag/Environment": "dev"
+        }
+      }
+    },
+    {
+      "Sid": "CreateTaggedDevSecurityRules",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:AuthorizeSecurityGroupIngress",
+        "ec2:AuthorizeSecurityGroupEgress"
+      ],
+      "Resource": "arn:aws:ec2:eu-west-2:218549829565:security-group-rule/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Project": "godiffy",
+          "aws:RequestTag/Environment": "dev",
+          "aws:RequestTag/ManagedBy": "terraform",
+          "aws:RequestTag/Purpose": "cloudpay-technical-assessment"
+        }
+      }
+    },
+    {
       "Sid": "ModifyOnlyDevNetwork",
       "Effect": "Allow",
       "Action": [

@@ -3,6 +3,8 @@ import importlib.util
 import json
 from pathlib import Path
 import unittest
+from datetime import datetime, timezone
+from unittest.mock import patch
 
 
 def load(filename):
@@ -14,6 +16,7 @@ def load(filename):
 
 audit_module = load("check-dev-plan.py")
 policies_module = load("ci-policies.py")
+repair_module = load("repair-dev-log-state.py")
 
 
 class DevDeliveryTests(unittest.TestCase):
@@ -109,3 +112,29 @@ class DevDeliveryTests(unittest.TestCase):
             # human bootstrap stages, while baseline policies remain testable.
             if name not in ("boundary-bootstrap", "ci-iam", "ci-control"):
                 self.assertEqual(committed, policy)
+
+
+class EmptyLogRepairTests(unittest.TestCase):
+    def run_repair(self, *, tainted=True, streams=False, owned=True, recent=True):
+        state = {"resources": [{"module": "module.godiffy.module.database", "type": "aws_cloudwatch_log_group", "name": "postgresql", "instances": [{"status": "tainted" if tainted else "ready", "attributes": {"name": repair_module.NAME}}]}]}
+        responses = [
+            {"Account": "218549829565", "Arn": "arn:aws:sts::218549829565:assumed-role/cloudpay-demo-github-actions/test"},
+            {"logGroups": [{"logGroupName": repair_module.NAME, "creationTime": datetime.now(timezone.utc).timestamp() * 1000 if recent else 0, "storedBytes": 0}]},
+            {"tags": repair_module.TAGS if owned else {}},
+            {"logStreams": [{"logStreamName": "existing"}] if streams else []},
+        ]
+        with patch.object(repair_module, "read", return_value=state), patch.object(repair_module, "aws", side_effect=responses), patch.object(repair_module.subprocess, "run") as mutate:
+            if tainted and not streams and owned and recent:
+                repair_module.main()
+                mutate.assert_called_once_with(["terraform", "-chdir=terraform/environments/dev", "untaint", repair_module.ADDRESS], check=True, timeout=120)
+            else:
+                with self.assertRaises(RuntimeError):
+                    repair_module.main()
+                mutate.assert_not_called()
+
+    def test_only_failed_new_empty_owned_resource_is_retained(self):
+        self.run_repair()
+
+    def test_refuses_ordinary_nonempty_unowned_or_old_resource(self):
+        for options in ({"tainted": False}, {"streams": True}, {"owned": False}, {"recent": False}):
+            self.run_repair(**options)

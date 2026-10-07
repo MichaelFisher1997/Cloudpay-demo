@@ -1,8 +1,9 @@
 # Godiffy operations and staged rollout
 
 **Use the user's current authorization, not this runbook as blanket permission.**
-DEV-only deployment is now approved within the small-dev design; AWS authentication
-is currently blocked. Only the state backend has been applied. Review each real
+DEV-only deployment is now approved within the small-dev design and **must run
+from GitHub Actions**. Human SSO is limited to read-only verification and narrowly
+scoped DEV CI IAM bootstrap; it is not the application deployment identity. Review each real
 DEV plan and stop if it includes deletions, unrelated/Portyard/production resources
 or unexpected scope. Production, ACM and DNS work below remain future runbook
 instructions, not authorized actions.
@@ -17,25 +18,32 @@ additions; prod 76. These are **combined design-review plans**, not approval to
 skip the agreed incremental review. If smaller infrastructure slices are desired,
 prepare/review a staged code change; do not normalize routine `-target` deployment.
 
-Inside the existing Nix shell, from repository root:
+From repository root, dispatch the DEV-only workflow:
 
 ```sh
-umask 077
-export AWS_PROFILE=portyard AWS_REGION=eu-west-2 AWS_PAGER=""
-aws sts get-caller-identity --region eu-west-2
-terraform -chdir=terraform/environments/dev init -backend-config=backend.hcl
-terraform -chdir=terraform/environments/dev plan -out=dev-foundations.tfplan
-terraform -chdir=terraform/environments/dev show -no-color dev-foundations.tfplan
-python3 scripts/check-plan.py dev terraform/environments/dev/dev-foundations.tfplan
+gh workflow run dev-deploy.yml --ref master -f phase=foundations -f operation=plan
+gh run view <returned-run-id> --log
 ```
 
-Account must be `218549829565`. The audit checks foundation scope, known dangerous
-properties, tags, account and create-only actions; it is **not** apply approval, a
+Account must be `218549829565`. `check-dev-plan.py` audits the saved plan for DEV
+scope, known dangerous properties, cost shape, tags, account and no deletions or
+replacements; it is **not** blanket apply approval, a
 complete IAM analyzer, or proof of runtime correctness. Inspect values still unknown
-at plan and verify them after apply. Saved plans are ignored, owner-only and local.
+at plan and verify them after apply. Saved plans are ignored, owner-only and runner-local;
+raw JSON/state are not published. The initial Actions plan additionally imports
+the exact nine human-bootstrapped policies and five existing attachments without
+IAM mutations. These are not Portyard/application imports.
 If SSO expires, renew the existing profile; do not replace it or create AWS keys.
 
-Only after explicit approval use `terraform apply <that-saved-plan>`. Foundation
+After review within current DEV authorization, copy the exact reported fingerprint:
+
+```sh
+gh workflow run dev-deploy.yml --ref master -f phase=foundations -f operation=apply \
+  -f expected_fingerprint=<reviewed-plan-fingerprint>
+```
+
+Actions re-plans, rejects any semantic difference and applies that saved plan in
+the same runner. No local application apply is permitted. Foundation
 ALB/RDS/endpoints cost money even before tasks run. The backend is independent of
 either environment's teardown.
 
@@ -47,30 +55,29 @@ Allow the initial S3 versioning propagation window before upload/state writes.
 
 ## 2. First immutable image and job definitions
 
-After an approved ECR foundation apply, build linux/amd64, push to the dedicated
+After an approved ECR foundation apply, dispatch `dev-image.yml` to build linux/amd64 and push to the dedicated
 `godiffy-dev-application` repository with an immutable unique release tag, inspect
 ECR scan results, and record the manifest digest. Runtime never downloads packages
 or public CA bundles: the image contains code/dependencies and the public RDS CA.
 
-Use an ignored owner-only `release.local.tfvars`, for example:
+Dispatch the job-definition plan with the actual reported digest:
 
-```hcl
-release = {
-  image_digest      = "<real reviewed sha256 digest from the dedicated ECR repository>"
-  bootstrap_enabled = true
-  service_enabled   = false
-  database_ready    = false
-}
+```sh
+gh workflow run dev-image.yml --ref master
+gh workflow run dev-deploy.yml --ref master -f phase=jobs -f operation=plan \
+  -f image_digest=<actual-DEV-ECR-manifest-digest>
 ```
 
-The placeholder intentionally fails validation. Do not copy digests from mocked
-tests or use `latest`. Plan with `-var-file=release.local.tfvars`, review the new
-temporary bootstrap role/policy and job/task definitions, then obtain separate
-approval. Terraform does not automatically execute the jobs.
+Placeholders intentionally fail validation. Do not copy digests from mocked
+tests or use `latest`. Before the jobs apply, human bootstrap binds the bootstrap
+boundary to the exact master secret ARN from the dedicated DEV RDS metadata (not
+its value). Review new bootstrap role/policy and definitions; use the jobs plan's
+fingerprint for an Actions apply. Terraform itself does not execute jobs; the
+workflow checks each approved job's exit status afterward.
 
 ## 3. Initialize and migrate
 
-Use deployment outputs for cluster, job-definition ARNs, exact private task subnets,
+The Actions jobs phase uses deployment outputs for cluster, job-definition ARNs, exact private task subnets,
 task SG, DB host and secret ARNs. Run one bootstrap Fargate task with `assignPublicIp`
 disabled and its dedicated task role; wait for STOPPED and check its essential
 container exit code is zero. Watch only the dedicated CloudWatch log group, without
@@ -83,19 +90,21 @@ RDS master-role behavior: local PostgreSQL tests are not AWS `rds_superuser` pro
 Do not put generated credentials in Terraform, task definition secret values,
 GitHub plaintext outputs, local tfvars, container layers or logs.
 
-After successful migration, restrict temporary bootstrap privileges. The draft
-currently removes its role/policy/task definition when `bootstrap_enabled` is
-disabled; amend this to retain disabled resources before deploying the jobs.
+After successful migration, restrict temporary bootstrap privileges. The service
+phase sets `bootstrap_enabled=false` and `bootstrap_retained=true`: the role's
+trust and secret policy become explicit denials, while resources/definitions remain.
 The current authorization forbids applying plans with resource deletions, even
 for this cleanup. Service validation rejects leaving master-access bootstrap enabled.
 
 ## 4. Activate dev service and verify core behavior
 
-Set the real digest, `bootstrap_enabled=false`, `database_ready=true`,
-`service_enabled=true`; optionally provide approved **disposable dev test**
-`invited_emails`. Addresses are not secrets but are visible in Terraform/task
+Dispatch `phase=service` with the same real digest. Actions generates the retired
+bootstrap/ready-database/service inputs and approved **disposable DEV test**
+email allowlist. Addresses are not secrets but are visible in Terraform/task
 configuration. Empty defaults disable registration. Review and approve the saved
-service plan. Until final TLS integration, only the ALB hostname over HTTP works.
+service plan and supply its fingerprint for apply. A private DB verification runs
+again before service apply; HTTP/S3 smoke follows activation. Until separately
+authorized final TLS integration, only the ALB hostname over HTTP works.
 
 Check:
 

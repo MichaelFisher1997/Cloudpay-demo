@@ -1,7 +1,8 @@
 locals {
-  environment = var.production ? "prod" : "dev"
-  image       = var.release.image_digest == null ? null : "${aws_ecr_repository.this.repository_url}@${var.release.image_digest}"
-  origin      = var.app_url != null ? var.app_url : "http://${aws_lb.this.dns_name}"
+  environment     = var.production ? "prod" : "dev"
+  release_digests = var.release.image_digest == null ? toset([]) : setunion(toset([var.release.image_digest]), var.release.retained_image_digests)
+  release_images  = { for digest in local.release_digests : digest => "${aws_ecr_repository.this.repository_url}@${digest}" }
+  origin          = var.app_url != null ? var.app_url : "http://${aws_lb.this.dns_name}"
   log_options = {
     "awslogs-group"         = aws_cloudwatch_log_group.application.name
     "awslogs-region"        = "eu-west-2"
@@ -19,6 +20,17 @@ locals {
     !var.production ? { verify = { role_arn = aws_iam_role.runtime.arn } } : {},
     var.release.bootstrap_enabled || var.release.bootstrap_retained ? { bootstrap = { role_arn = aws_iam_role.bootstrap[0].arn } } : {}
   )
+  # Retain old immutable definitions: a new image creates revisions instead of
+  # deleting/replacing prior definitions under the current no-deletion approval.
+  job_definitions = {
+    for job in flatten([
+      for digest in local.release_digests : [
+        for kind, settings in local.job_types : {
+          key = "${digest}/${kind}", kind = kind, image = local.release_images[digest], role_arn = settings.role_arn
+        }
+      ]
+    ]) : job.key => job
+  }
 }
 
 resource "aws_ecr_repository" "this" {
@@ -45,10 +57,10 @@ resource "aws_ecr_lifecycle_policy" "this" {
 }
 
 data "aws_ecr_image" "release" {
-  count           = var.release.image_digest == null ? 0 : 1
+  for_each        = local.release_images
   registry_id     = var.account_id
   repository_name = aws_ecr_repository.this.name
-  image_digest    = var.release.image_digest
+  image_digest    = each.key
 }
 
 resource "aws_cloudwatch_log_group" "application" {
@@ -165,7 +177,7 @@ resource "aws_lb_listener" "https" {
 }
 
 resource "aws_ecs_task_definition" "web" {
-  count                    = var.release.image_digest == null ? 0 : 1
+  for_each                 = local.release_images
   family                   = "${var.name}-web"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
@@ -179,7 +191,7 @@ resource "aws_ecs_task_definition" "web" {
   }
   container_definitions = jsonencode([{
     name                   = "web"
-    image                  = local.image
+    image                  = each.value
     essential              = true
     readonlyRootFilesystem = true
     user                   = "10001:10001"
@@ -208,8 +220,8 @@ resource "aws_ecs_task_definition" "web" {
 }
 
 resource "aws_ecs_task_definition" "job" {
-  for_each                 = local.job_types
-  family                   = "${var.name}-${each.key}"
+  for_each                 = local.job_definitions
+  family                   = "${var.name}-${each.value.kind}"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
   cpu                      = "256"
@@ -221,18 +233,18 @@ resource "aws_ecs_task_definition" "job" {
     operating_system_family = "LINUX"
   }
   container_definitions = jsonencode([{
-    name                   = each.key
-    image                  = local.image
-    command                = ["bun", "run", "db:${each.key}"]
+    name                   = each.value.kind
+    image                  = each.value.image
+    command                = ["bun", "run", "db:${each.value.kind}"]
     essential              = true
     readonlyRootFilesystem = true
     user                   = "10001:10001"
     environment = concat(local.common_environment, [
       { name = "MIGRATION_SECRET_ARN", value = var.database.migration_secret_arn },
-      ], each.key == "bootstrap" ? [
+      ], each.value.kind == "bootstrap" ? [
       { name = "DATABASE_SECRET_ARN", value = var.database.runtime_secret_arn },
       { name = "MASTER_SECRET_ARN", value = var.database.master_secret_arn },
-      ] : [], each.key == "verify" ? [
+      ] : [], each.value.kind == "verify" ? [
       { name = "DATABASE_SECRET_ARN", value = var.database.runtime_secret_arn },
       { name = "MASTER_SECRET_ARN", value = var.database.master_secret_arn },
       { name = "APP_URL", value = local.origin },
@@ -251,7 +263,7 @@ resource "aws_ecs_service" "this" {
   count                              = var.release.service_enabled ? 1 : 0
   name                               = "${var.name}-web"
   cluster                            = aws_ecs_cluster.this.id
-  task_definition                    = aws_ecs_task_definition.web[0].arn
+  task_definition                    = aws_ecs_task_definition.web[var.release.image_digest].arn
   launch_type                        = "FARGATE"
   platform_version                   = "1.4.0"
   desired_count                      = var.production ? 2 : 1
