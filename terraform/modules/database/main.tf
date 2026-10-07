@@ -9,8 +9,9 @@ resource "aws_db_parameter_group" "this" {
   family = "postgres17"
   tags   = var.tags
   parameter {
-    name  = "rds.force_ssl"
-    value = "1"
+    name         = "rds.force_ssl"
+    value        = "1"
+    apply_method = "pending-reboot"
   }
   # Prevent SQL error logging from exposing credentials in bootstrap role DDL.
   parameter {

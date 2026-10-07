@@ -21,7 +21,8 @@ run "dev_database_safety" {
       aws_db_instance.this.deletion_protection && !aws_db_instance.this.skip_final_snapshot &&
       aws_db_instance.this.manage_master_user_password && aws_db_instance.this.password == null &&
       aws_db_instance.this.backup_retention_period == 7 && !aws_db_instance.this.multi_az &&
-      aws_db_instance.this.instance_class == "db.t4g.micro"
+      aws_db_instance.this.instance_class == "db.t4g.micro" &&
+      alltrue([for parameter in aws_db_parameter_group.this.parameter : parameter.apply_method == "pending-reboot" if parameter.name == "rds.force_ssl"])
     )
     error_message = "Dev must retain private/encrypted/snapshot-protected RDS with AWS-managed master credentials."
   }

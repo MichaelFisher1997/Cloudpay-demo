@@ -99,7 +99,11 @@ run "reject_mutable_image" {
 run "bootstrap_restricted_and_retained" {
   command = plan
   variables {
-    release = { image_digest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", service_enabled = true, database_ready = true, bootstrap_retained = true }
+    release = {
+      image_digest           = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      retained_image_digests = ["sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]
+      service_enabled        = true, database_ready = true, bootstrap_retained = true
+    }
     task_permissions_boundaries = {
       runtime = "arn:aws:iam::218549829565:policy/godiffy-dev-boundary-runtime"
     }
@@ -125,7 +129,7 @@ run "new_image_retains_previous_definitions" {
   }
   assert {
     condition = (
-      length(aws_ecs_task_definition.web) == 2 && length(aws_ecs_task_definition.job) == 6 &&
+      length(aws_ecs_task_definition.web) == 2 && length(aws_ecs_task_definition.job) == 5 &&
       contains(keys(aws_ecs_task_definition.web), "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") &&
       contains(keys(aws_ecs_task_definition.web), var.release.image_digest)
     )
