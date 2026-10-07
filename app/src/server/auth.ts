@@ -27,6 +27,8 @@ export function authSettings(
   const issuer = required(env.CLERK_ISSUER, "CLERK_ISSUER");
   if (
     issuer !== `https://${host}` ||
+    !/^https:\/\/[a-z0-9][a-z0-9.-]*[a-z0-9]$/.test(issuer) ||
+    (c.environment === "prod" && host.endsWith(".clerk.accounts.dev")) ||
     (c.environment === "dev" &&
       !/^[a-z0-9-]+\.clerk\.accounts\.dev$/.test(host))
   )

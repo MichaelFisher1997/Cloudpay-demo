@@ -8,6 +8,12 @@ variables {
     image_digest    = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     service_enabled = true
     database_ready  = true
+    clerk_auth = {
+      publishable_key = "pk_live_${base64encode("clerk.gallery.example$")}"
+      issuer          = "https://clerk.gallery.example"
+      jwt_key         = "-----BEGIN PUBLIC KEY-----\nmock-only-not-a-real-key"
+      allowed_emails  = ["owner@example.invalid"]
+    }
   }
 }
 run "reject_unreviewed_production" {
@@ -24,4 +30,20 @@ run "reviewed_production_shape_mock_only" {
     )
     error_message = "The reviewed production shape must have two task AZs, HTTPS and an alert recipient."
   }
+}
+run "reject_production_without_alarm_recipient" {
+  command = plan
+  variables {
+    production_reviewed = true
+    alarm_email         = null
+  }
+  expect_failures = [var.release]
+}
+run "reject_production_without_tls" {
+  command = plan
+  variables {
+    production_reviewed = true
+    certificate_arn     = null
+  }
+  expect_failures = [var.release]
 }

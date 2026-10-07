@@ -101,6 +101,71 @@ test("Clerk runtime requires environment-matched public keys and exact emails", 
     expect(() => authSettings({ ...env, ...change })).toThrow();
 });
 
+test("Production live configuration verifies signed sessions offline", async () => {
+  const issuer = "https://clerk.gallery.example";
+  const settings = authSettings({
+    ENVIRONMENT: "prod",
+    APP_URL: fixture.settings.origin,
+    AWS_REGION: "eu-west-2",
+    IMAGE_BUCKET: "local",
+    DATABASE_HOST: "local",
+    DATABASE_SECRET_ARN: "local",
+    CLERK_PUBLISHABLE_KEY: `pk_live_${Buffer.from("clerk.gallery.example$").toString("base64")}`,
+    CLERK_ISSUER: issuer,
+    CLERK_JWT_KEY: fixture.settings.jwtKey,
+    CLERK_ALLOWED_EMAILS: "owner@example.test",
+  });
+  const fetch = spyOn(globalThis, "fetch").mockRejectedValue(
+    new Error("No network allowed"),
+  );
+  try {
+    expect(
+      await authenticatedOwner(
+        request(fixture.token({ iss: issuer })),
+        settings,
+      ),
+    ).toBe("user_localOwner");
+    expect(
+      await authenticatedOwner(request(fixture.token()), settings),
+    ).toBeNull();
+    expect(fetch).not.toHaveBeenCalled();
+  } finally {
+    fetch.mockRestore();
+  }
+});
+
+test("Production configuration rejects development issuers, missing auth and HTTP", () => {
+  const env = {
+    ENVIRONMENT: "prod",
+    APP_URL: fixture.settings.origin,
+    AWS_REGION: "eu-west-2",
+    IMAGE_BUCKET: "local",
+    DATABASE_HOST: "local",
+    DATABASE_SECRET_ARN: "local",
+    CLERK_PUBLISHABLE_KEY: `pk_live_${Buffer.from("clerk.gallery.example$").toString("base64")}`,
+    CLERK_ISSUER: "https://clerk.gallery.example",
+    CLERK_JWT_KEY: fixture.settings.jwtKey,
+    CLERK_ALLOWED_EMAILS: "owner@example.test",
+  };
+  for (const change of [
+    {
+      CLERK_PUBLISHABLE_KEY: fixture.settings.publishableKey,
+      CLERK_ISSUER: fixture.settings.issuer,
+    },
+    {
+      CLERK_PUBLISHABLE_KEY: `pk_live_${Buffer.from("test.clerk.accounts.dev$").toString("base64")}`,
+      CLERK_ISSUER: "https://test.clerk.accounts.dev",
+    },
+    { CLERK_PUBLISHABLE_KEY: "" },
+    { CLERK_ISSUER: "https://clerk.other.example" },
+    { CLERK_JWT_KEY: "" },
+    { CLERK_ALLOWED_EMAILS: "" },
+    { APP_URL: "http://gallery.example" },
+    { ALLOW_INSECURE_HTTP: "true" },
+  ])
+    expect(() => authSettings({ ...env, ...change })).toThrow();
+});
+
 test("Approved reset fails closed on wrong account, environment, DB, region or secret", () => {
   const env = {
     GODIFFY_DEV_RESET_CONFIRMATION: resetConfirmation,

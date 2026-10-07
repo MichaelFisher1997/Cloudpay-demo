@@ -1,10 +1,20 @@
 variable "release" {
   description = "Default foundations only; production deployment is not authorised by this configuration."
   type = object({
-    image_digest      = optional(string)
-    bootstrap_enabled = optional(bool, false)
-    service_enabled   = optional(bool, false)
-    database_ready    = optional(bool, false)
+    image_digest                     = optional(string)
+    retained_image_digests           = optional(set(string), [])
+    retained_bootstrap_image_digests = optional(set(string), [])
+    retained_web_containers          = optional(map(string), {})
+    clerk_auth = optional(object({
+      publishable_key = string
+      issuer          = string
+      jwt_key         = string
+      allowed_emails  = list(string)
+    }))
+    bootstrap_enabled  = optional(bool, false)
+    bootstrap_retained = optional(bool, false)
+    service_enabled    = optional(bool, false)
+    database_ready     = optional(bool, false)
   })
   default = {}
 }

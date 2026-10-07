@@ -20,6 +20,9 @@ S3 objects/versions were preserved. [Access and verification status](docs/clerk-
   Google login and image upload/download/delete, plus unapproved-account rejection.
 - **Production remains undeployed:** its historical 76-addition foundation plan
   is design evidence, not authorization or a current apply input.
+  The production root now supports live Clerk configuration with fail-closed
+  activation tests; [production inputs and interview walkthrough](docs/production-readiness.md)
+  separate code readiness from launch approvals and unmeasured operational targets.
 - No Portyard application infrastructure, production application resources or DNS
   records were changed.
 - **DEV-only Actions delivery:** Nine exact DEV
@@ -28,7 +31,7 @@ S3 objects/versions were preserved. [Access and verification status](docs/clerk-
   deployment uses manual plan/apply/image Actions workflows only.
   See [dev deployment status](docs/dev-deployment.md).
 - Plans/state/dependencies and all credentials are excluded from Git.
-- **GitHub validation passed:** [run 37699566022](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37699566022)
+- **GitHub validation:** [latest credential-free CI](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/workflows/validate.yml)
   tests/builds the actual committed implementation without AWS credentials.
 
 DEV is intentionally HTTP-only: use non-sensitive images. Google credentials
@@ -78,6 +81,7 @@ Clerk authentication is browser-side; the private task verifies tokens offline.
 | [Historical review](docs/review.md) | Earlier build-and-plan evidence, not the current inventory |
 | [DEV handoff](docs/dev-deployment.md) | Actual inventory, digest, AWS results and verification limits |
 | [Interview notes](docs/interview.md) | What is actually deployed versus tested locally or only designed |
+| [Production readiness](docs/production-readiness.md) | Requirements, required inputs, tested activation gates and remaining launch evidence |
 | [Costs](docs/costs.md) | Official London prices, assumptions and endpoint/NAT comparison |
 | [Operations](docs/operations.md) | Staged deployment, verification, rollback, recovery and TLS last |
 | [Delivery security](docs/delivery.md) | Actions-only DEV rollout, IAM limits and separate production approvals |

@@ -77,9 +77,9 @@ Mutations require exact `Origin: APP_URL`; auth and image endpoints reject cross
 
 ## Verification and known limits
 
-- Local frozen install, format, strict types and build pass: **20 unit tests**,
+- Local frozen install, format, strict types and build pass: **22 unit tests**,
   one integration skip without DB, **54** built-server/PostgreSQL assertions,
-  **35** Python guard tests and **28** Terraform mock runs. Dependency audit:
+  **35** Python guard tests and **40** Terraform mock runs. Dependency audit:
   **0 advisories / 211 packages**. Actions additionally builds/scans the image.
 - Local PG17 uses a non-superuser database-owner/CREATEROLE master. It covers
   repeated/concurrent migration, runtime grants, guarded reset/rollback,

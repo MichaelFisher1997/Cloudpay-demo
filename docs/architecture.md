@@ -142,7 +142,10 @@ Only desired task count is ignored for autoscaling; Terraform owns task definiti
 and service configuration, avoiding a second conflicting deployment owner.
 
 Production guards require TLS, migrations acknowledged, an alarm recipient and
-an explicit review switch. Terraform booleans are not organizational approval
+an explicit review switch, plus live Clerk public configuration and named emails.
+Production root inputs now reach the application module; development issuers and
+key/issuer mismatches are rejected. See [production readiness](production-readiness.md)
+for tested guards and remaining launch evidence. Terraform booleans are not organizational approval
 boundaries: IAM/GitHub Environment protections must enforce that separately.
 DEV-only OIDC delivery is enabled and tested; no production deployment authority
 was granted. See [delivery](delivery.md).

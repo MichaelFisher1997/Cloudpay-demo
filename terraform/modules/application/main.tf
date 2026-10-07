@@ -209,7 +209,7 @@ resource "aws_ecs_task_definition" "web" {
       { name = "DATABASE_SECRET_ARN", value = var.database.runtime_secret_arn },
       { name = "APP_URL", value = local.origin },
       { name = "ALLOW_INSECURE_HTTP", value = !var.production && var.certificate_arn == null ? "true" : "false" },
-      # Production registration remains disabled until a verified invitation mechanism exists.
+      # Historical password-auth setting, unused by Clerk; retain for old definitions.
       { name = "INVITED_EMAILS", value = join(",", var.invited_emails) },
     ])
     logConfiguration = { logDriver = "awslogs", options = local.log_options }

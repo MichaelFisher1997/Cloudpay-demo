@@ -41,12 +41,12 @@ OIDC; the app simply demonstrates that the infrastructure works together.
 
 ## What can be demonstrated locally
 
-- Cohesive Terraform modules, thin dev/prod roots, pinned versions and **28 mocked tests**.
+- Cohesive Terraform modules, thin dev/prod roots, pinned versions and **40 mocked tests**.
 - DEV no-delete/fingerprint plans, focused retry records and retained release history;
   the old 76-addition production plan remains historical/unapplied.
 - TanStack/Bun gallery with offline Clerk bearer verification, exact verified-email
   restrictions, stable user-ID ownership and direct private version-pinned S3 transfers.
-- 20 unit tests plus 35 Python guard tests; local PG17/built-server HTTP integration with 54 assertions;
+- 22 unit tests plus 35 Python guard tests; local PG17/built-server HTTP integration with 54 assertions;
   non-root/read-only amd64 container smoke and zero dependency advisories at scan.
 - Cost comparison, explicit migration/runtime/master separation and runbooks.
 - Actual GitHub [Clerk validation run 37699566022](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37699566022)
@@ -62,6 +62,12 @@ separate unverified work. A browserless CORS preflight verifies protocol headers
 not every browser behavior.
 
 ## Architecture rationale to discuss
+
+For the test's **production-ready Terraform** requirement, show
+[the production configuration walkthrough](production-readiness.md): live Clerk
+inputs now reach ECS, activation gates are regression-tested, and the HA/security
+settings differ deliberately from cheap DEV. Do not confuse deployable configuration
+with completed production OAuth/TLS/CI approvals or measured recovery guarantees.
 
 ALB → private Fargate → private PostgreSQL/S3 keeps the application stateless.
 Direct signed browser transfers avoid streaming image bytes through compute.

@@ -34,6 +34,10 @@ variable "app_url" {
   type     = string
   default  = null
   nullable = true
+  validation {
+    condition     = var.app_url == null || can(regex("^https://[a-z0-9][a-z0-9.-]*[a-z0-9]$", var.app_url))
+    error_message = "An explicit application URL must be a bare HTTPS origin; only the default DEV ALB origin may use HTTP."
+  }
 }
 variable "certificate_arn" {
   type     = string
@@ -84,13 +88,23 @@ variable "release" {
   default = {}
   validation {
     condition = var.release.clerk_auth == null ? true : (
-      !var.production && startswith(var.release.clerk_auth.publishable_key, "pk_test_") &&
+      startswith(var.release.clerk_auth.publishable_key, var.production ? "pk_live_" : "pk_test_") &&
       startswith(var.release.clerk_auth.jwt_key, "-----BEGIN PUBLIC KEY-----") &&
-      can(regex("^https://[a-z0-9-]+\\.clerk\\.accounts\\.dev$", var.release.clerk_auth.issuer)) &&
+      (var.production ? (
+        can(regex("^https://[a-z0-9][a-z0-9.-]*[a-z0-9]$", var.release.clerk_auth.issuer)) &&
+        !endswith(var.release.clerk_auth.issuer, ".clerk.accounts.dev")
+      ) : can(regex("^https://[a-z0-9-]+\\.clerk\\.accounts\\.dev$", var.release.clerk_auth.issuer))) &&
+      try(base64decode(trimprefix(var.release.clerk_auth.publishable_key, var.production ? "pk_live_" : "pk_test_")), "") == "${trimprefix(var.release.clerk_auth.issuer, "https://")}$" &&
       length(var.release.clerk_auth.allowed_emails) > 0 &&
       alltrue([for email in var.release.clerk_auth.allowed_emails : can(regex("^[^@\\s*]+@[^@\\s*]+\\.[^@\\s*]+$", email))])
     )
-    error_message = "This Clerk cutover is DEV-only and requires test/public keys and specific email addresses."
+    error_message = "Clerk requires environment-matched publishable/public keys, a matching HTTPS issuer and named emails; production cannot use a development instance."
+  }
+  validation {
+    condition = !var.production || !var.release.service_enabled || (
+      var.release.clerk_auth != null && var.app_url != null
+    )
+    error_message = "Production service activation requires explicit Clerk live configuration and an HTTPS application origin."
   }
   validation {
     condition = (

@@ -105,7 +105,7 @@ run "clerk_release_keeps_old_web_configuration_immutable" {
       retained_web_containers = {
         "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" = jsonencode([{ name = "web", image = "218549829565.dkr.ecr.eu-west-2.amazonaws.com/godiffy-dev-application@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", environment = [{ name = "INVITED_EMAILS", value = "old@example.invalid" }] }])
       }
-      clerk_auth = { publishable_key = "pk_test_mock", issuer = "https://mock.clerk.accounts.dev", jwt_key = "-----BEGIN PUBLIC KEY-----\nmock", allowed_emails = ["allowed@example.invalid"] }
+      clerk_auth = { publishable_key = "pk_test_${base64encode("mock.clerk.accounts.dev$")}", issuer = "https://mock.clerk.accounts.dev", jwt_key = "-----BEGIN PUBLIC KEY-----\nmock", allowed_emails = ["allowed@example.invalid"] }
     }
   }
   assert {
@@ -187,7 +187,7 @@ run "reject_production_http" {
     production = true
     release    = { image_digest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", service_enabled = true, database_ready = true }
   }
-  expect_failures = [aws_ecs_service.this]
+  expect_failures = [var.release]
 }
 
 run "https_before_redirect" {
