@@ -67,6 +67,8 @@ try {
     },
   );
   created = true;
+  // Initialization uses a temporary Unix-socket server that stops before the
+  // final server starts. Wait for TCP, the same transport used by the tests.
   let ready = false;
   for (let attempt = 0; attempt < 60; attempt++) {
     try {
@@ -74,6 +76,8 @@ try {
         "exec",
         name,
         "pg_isready",
+        "-h",
+        "127.0.0.1",
         "-U",
         "godiffy_master",
         "-d",
