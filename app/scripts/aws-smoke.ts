@@ -387,6 +387,11 @@ async function main() {
       [404],
       "deleted image unavailable",
     );
+    expectStatus(
+      await fetch(signedDownload, { redirect: "manual" }),
+      [403, 404],
+      "deleted pinned S3 version unavailable",
+    );
     evidence.outcome = "pass";
   } finally {
     // Do not delete previous runs' images, users, or objects directly.

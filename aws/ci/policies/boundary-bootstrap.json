@@ -2,23 +2,13 @@
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "OnlyInitializationSecretReads",
-      "Effect": "Allow",
-      "Action": "secretsmanager:GetSecretValue",
-      "Resource": [
-        "arn:aws:secretsmanager:eu-west-2:218549829565:secret:godiffy-dev-runtime-*",
-        "arn:aws:secretsmanager:eu-west-2:218549829565:secret:godiffy-dev-migration-*",
-        "arn:aws:secretsmanager:eu-west-2:218549829565:secret:rds!db-6efa800a-d7c4-4766-9980-ad287bcdd760-ZJkNNa"
-      ]
-    },
-    {
-      "Sid": "OnlyInitializationSecretWrites",
-      "Effect": "Allow",
-      "Action": "secretsmanager:PutSecretValue",
-      "Resource": [
-        "arn:aws:secretsmanager:eu-west-2:218549829565:secret:godiffy-dev-runtime-*",
-        "arn:aws:secretsmanager:eu-west-2:218549829565:secret:godiffy-dev-migration-*"
-      ]
+      "Sid": "RetiredInitializationCannotReadOrWriteSecrets",
+      "Effect": "Deny",
+      "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:PutSecretValue"
+      ],
+      "Resource": "*"
     }
   ]
 }

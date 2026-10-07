@@ -160,8 +160,7 @@
       "Resource": [
         "arn:aws:iam::218549829565:role/godiffy-dev-execution",
         "arn:aws:iam::218549829565:role/godiffy-dev-runtime",
-        "arn:aws:iam::218549829565:role/godiffy-dev-migration",
-        "arn:aws:iam::218549829565:role/godiffy-dev-bootstrap"
+        "arn:aws:iam::218549829565:role/godiffy-dev-migration"
       ],
       "Condition": {
         "StringEquals": {
