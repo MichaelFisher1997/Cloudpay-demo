@@ -19,6 +19,7 @@ policies_module = load("ci-policies.py")
 repair_module = load("repair-dev-log-state.py")
 verify_module = load("verify-dev.py")
 db_repair_module = load("repair-dev-db-state.py")
+job_module = load("run-dev-job.py")
 
 
 class DevDeliveryTests(unittest.TestCase):
@@ -191,3 +192,15 @@ class EmptyDatabaseRepairTests(unittest.TestCase):
     def test_refuses_initialized_old_or_previously_run_application(self):
         for options in ({"initialized": True}, {"recent": False}, {"jobs": True}, {"task": True}):
             self.run_repair(**options)
+
+
+class ActionsJobTests(unittest.TestCase):
+    def test_only_actions_may_run_private_jobs(self):
+        target = {"account_id": "218549829565", "region": "eu-west-2", "environment": "dev", "cluster_name": "godiffy-dev-cluster"}
+        identity = {"Account": "218549829565", "Arn": "arn:aws:sts::218549829565:assumed-role/cloudpay-demo-github-actions/test"}
+        job_module.validate_target(target, identity)
+        for arn in ("arn:aws:sts::218549829565:assumed-role/AWSReservedSSO_PortyardAdministrator_fixture/michael", "arn:aws:iam::218549829565:user/fixture"):
+            with self.assertRaises(RuntimeError):
+                job_module.validate_target(target, {**identity, "Arn": arn})
+        with self.assertRaises(RuntimeError):
+            job_module.validate_target({**target, "environment": "prod"}, identity)

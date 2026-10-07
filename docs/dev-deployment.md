@@ -1,6 +1,6 @@
 # DEV deployment status — 7 October 2026
 
-## Outcome: DEV foundations partially created; focused Actions retry prepared
+## Outcome: DEV foundations converged; image published; private jobs next
 
 The user approved autonomous **DEV-only** deployment in account `218549829565`,
 region `eu-west-2`, using the existing `portyard` SSO profile and
@@ -45,6 +45,21 @@ permissions and valid SNS topic actions. One failed-new empty DB log group is
 tainted; an explicitly selected Actions repair verifies recent creation, ownership
 and no streams/data before retaining it with `untaint`, not replacing/deleting it.
 
+The next apply created the remaining network, RDS and ALB but stopped on an
+unfiltered provider RDS metadata read. An exact account/region read-only permission
+fixed that path. The failed-new DB was verified available, recent, correctly tagged,
+with no application credentials, jobs or tasks, then retained by Actions `untaint`.
+Both repairs kept the physical resources; neither deleted data or infrastructure.
+
+[Foundation apply 37630947179](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37630947179)
+completed its last **8 additions, 0 changes, 0 deletions** and confirmed **no changes**
+on a refreshed plan. The complete foundation is **73 new DEV records plus 14 exact
+CI imports**. [Image publication 37628283144](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37628283144)
+built/smoke-tested amd64 and pushed immutable tag `1c0b0f698fb4b1e31d5ee99916a3b894f7f24f07`,
+digest `sha256:44c6c7efdd7feb4b688bea19c1c158f6efcea49accb213b31c5426e0bd44dfa3`.
+The jobs [plan 37631037555](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37631037555)
+passed scope review: **6 additions, 0 changes, 0 deletions**. It has not run jobs yet.
+
 The implementation and status/runbooks were committed and pushed to `master` in
 `7809dabb87812ae9da125003a5d7d8df826c9bc9`. GitHub
 [validation run 37607324492](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37607324492)
@@ -68,17 +83,17 @@ Do not send tokens/passwords in chat, replace the profile or create access keys.
 
 | Required handoff item | Actual status |
 | --- | --- |
-| Deployed resources | Six approved backend resources plus partial dedicated DEV foundations and exact CI imports; full inventory recorded after convergence |
-| Plan/apply counts | Actions foundation plan **73 add / 0 change / 0 delete / 14 imports**; partial apply failed on narrow API/IAM issues, no resource deletion |
-| DEV ALB URL | Not created; no application URL is available |
-| ECR tag/digest | Local amd64 image built/tested; no ECR repository/image publication yet |
-| ECS service/tasks | Not created; no Fargate job or service execution |
-| RDS | Not created; production RDS TLS path untested |
+| Deployed resources | Six approved backend records; **87 DEV state records** = 73 new foundations plus 14 exact CI policy/attachment imports |
+| Plan/apply counts | Foundations completed across focused retries, **0 deletions**; final refreshed plan **0 add / 0 change / 0 delete**; jobs plan **6 / 0 / 0** |
+| DEV ALB URL | `http://godiffy-dev-alb-1345285825.eu-west-2.elb.amazonaws.com`; listener exists but no service target yet, not a working website |
+| ECR tag/digest | Immutable commit `1c0b0f698fb4b1e31d5ee99916a3b894f7f24f07`; digest `sha256:44c6c7efdd7feb4b688bea19c1c158f6efcea49accb213b31c5426e0bd44dfa3`; published by Actions |
+| ECS service/tasks | Cluster exists; no service/task/job execution yet |
+| RDS | `godiffy-dev-postgres`, PostgreSQL 17.9, private encrypted Single-AZ `db.t4g.micro`, available with active RDS-managed master secret; TLS/SQL privileges not yet exercised |
 | S3 image tests | Only local mock/presigned-policy tests; real S3 POST/CORS/download/delete/private-access tests not performed |
 | Bootstrap/migration | Local PG17 and actual built-server HTTP tests pass; no AWS job run |
-| IAM task roles | Planned execution/runtime/migration roles; none created in DEV |
+| IAM task roles | Execution/runtime/migration roles created with exact role-specific human-controlled boundaries; bootstrap role planned, exact master ARN bound |
 | GitHub OIDC | Existing provider/trust unchanged; five exact DEV CI scopes and four immutable task boundaries human-bootstrapped |
-| GitHub validation | Run 37607324492 succeeded for commit 7809dab; no AWS deployment step |
+| GitHub validation | Latest run 37630526181 succeeded for `0f7573b`; no AWS credentials/deployment in validation |
 | Real AWS tests in this attempt | SSO/OIDC identity, CI policy validation/bootstrap and partial foundation apply; deployed app path not yet tested |
 | Earlier blocker | SSO expiry resolved by the user; intermittent AWS API read timeouts were handled by bounded, idempotent bootstrap retries |
 | Still unverified | Entire deployed DEV path, private ECR pull, RDS master privileges/TLS, real S3 semantics, ALB health, logs/metrics, alarms, task replacement and OIDC deployment |
@@ -97,9 +112,9 @@ scope-reviewed before apply, not assumed current because they exist locally.
 - [x] Amend bootstrap retirement to restriction without Terraform resource deletion.
 - [x] Validate and bootstrap exact DEV-only OIDC permissions and task boundaries.
 - [x] Commit/push Actions-only delivery workflows and offline/real-test safeguards.
-- [ ] Re-plan DEV; reject all deletions/unrelated resources; apply the reviewed saved plan.
+- [x] Re-plan DEV; reject all deletions/unrelated resources; apply reviewed foundations and confirm convergence.
 - [ ] Verify network, private endpoints/SGs, versioned private images, RDS and ECR.
-- [ ] Commit/build a linux/amd64 image; publish immutable SHA tag and record digest.
+- [x] Commit/build a linux/amd64 image; publish immutable SHA tag and record digest.
 - [ ] Plan/apply narrowly scoped private bootstrap/migration definitions and roles.
 - [ ] Run/check job exit codes; test RDS TLS and runtime SQL privileges.
 - [ ] Restrict bootstrap access in place, without deleting Terraform resources.
