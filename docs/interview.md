@@ -4,9 +4,10 @@ Focus on explaining the infrastructure you have, not memorising every support
 script. The product is a small named-user image gallery; the assessment is the
 Terraform-managed web service, database, S3 access and Well-Architected decisions.
 
-Delivery story: **develop on `dev` → PR validation → merge to `dev` → manual AWS DEV
-release**. `master` is inactive for deployment. The production root demonstrates
-module reuse only. The new branch trust is proposed, not yet applied to AWS.
+Delivery story: **work/push on `dev` → validation → manual AWS DEV release**.
+Code promotion uses **PR from `dev` to protected `master` → checks → owner merge**;
+`master` never deploys. The production root demonstrates module reuse only.
+The live OIDC trust matches only `dev`, and its identity-only Actions check passed.
 
 ## Tonight: follow the dependency path
 

@@ -1,19 +1,21 @@
 # Delivery: validation, image, reviewed release
 
-**Develop on `dev` → PR checks → merge to `dev` → manually deploy to existing AWS DEV.**
-Work on `dev` is integrated through short-lived feature-branch PRs targeting `dev`.
+**Work and push directly on `dev` → validate → manually deploy to existing AWS DEV.**
+Code promotion is a PR **from `dev` into protected `master`**, followed by passing
+checks and the owner's merge decision. No PR into `dev` is required.
 `master` has no active deployment role. Production is a Terraform example/template,
 not a deployed environment or delivery pipeline.
 
-Repository changes are prepared locally. DEV authentication from `dev` remains
-blocked until the separately approved [OIDC trust update](aws-oidc.md) is applied.
-Publish `dev` and approve it as the GitHub default branch so manual workflows are
-discoverable. Require validation and PR review on `dev` to enforce approved merges;
-workflow YAML alone does not enforce review or prevent direct pushes.
+`dev` is published and is GitHub's default branch, with no branch protection.
+Repository write/admin access is limited to the owner account. `master` requires
+a PR and the `validate` status check, including for admins; force pushes and branch
+deletion are blocked. Required third-party approval count is zero because GitHub
+does not allow the solo owner to approve their own PR. The owner controls merges.
+The approved [OIDC trust update](aws-oidc.md) is applied and identity-tested.
 
 ## 1. Validate without AWS credentials
 
-`.github/workflows/validate.yml` runs on PRs targeting `dev`, pushes to `dev` and
+`.github/workflows/validate.yml` runs on PRs targeting `master`, pushes to `dev` and
 manual dispatch. It checks
 Terraform formatting/validation/mock tests, application types/tests/build, local
 PostgreSQL integration and a non-root/read-only container smoke. It does not read
@@ -30,7 +32,8 @@ scan without critical/high findings. Application dependency checks are separate.
 
 The manually dispatched `dev-deploy.yml` runs only on `dev` and uses an existing
 immutable image digest. For the running environment, use `phase=service`.
-Merge to `dev` does not automatically build, apply or run a database migration.
+Neither pushing to `dev` nor merging to `master` automatically builds an image,
+applies Terraform or runs a database migration.
 
 1. OIDC assumes the DEV-scoped AWS role; no permanent AWS keys are stored in GitHub.
 2. Initialize the DEV S3 backend with native locking.
@@ -51,9 +54,9 @@ ignored because autoscaling owns it; there is no competing CLI deployment owner.
 
 ## Identity and safety boundaries
 
-- The proposed OIDC trust accepts only this repository's immutable identity on
-  `dev`, not `master`, PR or protected-environment subjects. The previously recorded
-  live trust is `master`-only; no AWS update or fresh live inspection was performed.
+- The live OIDC trust accepts only this repository's immutable identity on `dev`,
+  not `master`, PR or protected-environment subjects. The approved change replaced
+  the previous exact `master` subject without changing permission policies.
 - Human-bootstrapped CI policies and task boundaries constrain DEV authority.
   Actions cannot modify its own grants or restore retired bootstrap privilege.
 - Execution pulls images/writes logs; runtime reads its own secret and accesses

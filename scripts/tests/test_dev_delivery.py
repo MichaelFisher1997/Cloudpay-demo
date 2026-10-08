@@ -211,12 +211,12 @@ class RevisionHistoryTests(unittest.TestCase):
 
 
 class SimplifiedWorkflowTests(unittest.TestCase):
-    def test_validation_targets_dev_without_aws_credentials(self):
+    def test_validation_checks_dev_pushes_and_master_prs_without_aws_credentials(self):
         root = Path(__file__).parents[2]
         workflow = (root / ".github/workflows/validate.yml").read_text()
-        self.assertIn("  pull_request:\n    branches: [dev]", workflow)
+        self.assertIn("  pull_request:\n    branches: [master]", workflow)
         self.assertIn("  push:\n    branches: [dev]", workflow)
-        self.assertNotIn("master", workflow)
+        self.assertNotIn("  push:\n    branches: [master]", workflow)
         self.assertNotIn("id-token: write", workflow)
         self.assertNotIn("configure-aws-credentials", workflow)
 
@@ -229,7 +229,7 @@ class SimplifiedWorkflowTests(unittest.TestCase):
             self.assertNotIn("refs/heads/master", workflow)
             self.assertNotIn("terraform/environments/prod", workflow)
 
-    def test_proposed_oidc_trust_is_exact_dev_subject_without_more_permissions(self):
+    def test_oidc_trust_is_exact_dev_subject_without_more_permissions(self):
         root = Path(__file__).parents[2]
         policy = json.loads((root / "aws/github-actions-trust-policy.json").read_text())
         self.assertEqual(policy, {

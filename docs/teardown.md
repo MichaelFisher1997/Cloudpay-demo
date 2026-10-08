@@ -12,8 +12,7 @@ run through an explicitly reviewed Actions job, not the local SSO session.
 - Preserve `godiffy-terraform-state-218549829565-eu-west-2`, bootstrap state, native
   locks, production state and both owner-only local pre-migration/state backups.
 - Preserve the existing GitHub OIDC provider, `cloudpay-demo-github-actions` role,
-  exact immutable-repository branch trust (the proposed `dev` switch needs separate
-  approval), `portyard` profile and human SSO role.
+  exact immutable-repository `dev` branch trust, `portyard` profile and human SSO role.
 - Preserve AWS-managed service-linked roles, including the two approved during DEV
   creation: they are account-level service identities, not DEV Terraform resources.
 - Never include Portyard resources, production, DNS or certificates.

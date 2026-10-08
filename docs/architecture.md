@@ -151,7 +151,9 @@ for tested guards and remaining launch evidence. Terraform booleans are not orga
 boundaries: IAM/GitHub Environment protections must enforce that separately.
 DEV-only OIDC delivery is enabled and tested; no production deployment authority
 was granted under the historical master-branch flow. The intended active branch is
-now `dev`; that exact OIDC trust change still needs approval. Production remains a
+now `dev`; the exact OIDC trust change was approved, applied and identity-tested.
+Direct development pushes use `dev`; PR checks/protection apply to promotion into
+`master`, which has no deployment authority. Production remains a
 module-reuse example/template, without a deployment pipeline. See [delivery](delivery.md).
 
 ## Six Well-Architected pillars

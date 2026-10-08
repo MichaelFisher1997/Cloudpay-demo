@@ -1,9 +1,9 @@
 # Godiffy operations and staged rollout
 
-The intended active branch is `dev`; `master` is not used for deployment.
-Before dispatching from `dev`, publish the branch and obtain approval for the exact
-[OIDC trust update and GitHub settings](aws-oidc.md). No live change is implied by
-this runbook. Production remains an undeployed example/template.
+The active branch is `dev`; `master` is not used for deployment. The branch is
+published, the [OIDC trust update](aws-oidc.md) is applied and identity-tested.
+Work/push directly on `dev`; protected PRs promote code from `dev` to `master`.
+No deployment is implied by this runbook. Production remains an undeployed example/template.
 
 **Use the user's current authorization, not this runbook as blanket permission.**
 DEV-only deployment is now approved within the small-dev design and **must run

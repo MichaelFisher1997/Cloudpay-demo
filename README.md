@@ -26,23 +26,27 @@ the server verifies tokens offline and checks ownership and verified-email acces
 
 ## Development and deployment workflow
 
-**Develop on `dev` → PR checks → merge to `dev` → deploy to AWS DEV.**
+**Work and push on `dev` → validate → manually deploy to AWS DEV.**
+When ready to promote the code: **PR from `dev` to protected `master` → checks → owner merges.**
 
-- `dev` is the active development/integration branch. Use short-lived feature
-  branches for PRs targeting `dev`; validation also runs on pushes to `dev`.
-- After review and merge, manually run the image workflow on `dev`, then the DEV
+- `dev` is the active/default development branch and permits direct pushes by
+  the repository owner. No feature branch or PR into `dev` is required.
+- Validation runs on pushes to `dev` and PRs targeting `master`.
+- Manually run the image workflow on `dev`, then the DEV
   deployment workflow: reviewed `service` plan followed by an explicit apply.
   Merging does not automatically change AWS infrastructure.
-- `master` is not part of the active workflow. The branch name does not select
+- `master` is protected for code promotion, not AWS deployment. The branch name does not select
   a Terraform environment: deployment still uses `terraform/environments/dev/`
   and the existing DEV state key, role and resource names.
 - `terraform/environments/prod/` is an undeployed example/template of module reuse;
   there is no production pipeline.
 
-**Activation pending:** these are local changes. Publishing `dev`, making it the
-GitHub default branch with required PR checks/review, and replacing the role's
-exact OIDC branch subject require separate approval. The trust-policy JSON is a
-proposal, not an applied AWS change. See [OIDC approval details](docs/aws-oidc.md).
+**Access:** only `MichaelFisher1997` is listed with repository write/admin access;
+there are no pending collaborator invitations or deploy keys. Public visitors can
+read/fork, not push. `master` requires a PR and passing `validate` check, including
+for admins; the owner decides when to merge (no impossible self-approval requirement).
+The live OIDC role trusts only `dev`, and the identity-only check passed.
+See [OIDC details](docs/aws-oidc.md). No infrastructure or image deployment was run.
 
 ```text
 terraform/bootstrap/               Protected S3 state backend and native locking
@@ -73,7 +77,8 @@ app/                              Small containerised gallery
 See [DEV evidence](docs/dev-deployment.md), [costs](docs/costs.md) and
 [Clerk access](docs/clerk-dev.md). Historical delivery records are in `docs/archive/`;
 they are not required study. Existing task-history/state compatibility controls
-remain; cleanup has not changed Terraform resources, AWS infrastructure or IAM.
+remain; cleanup has not changed Terraform resources, backend keys or IAM permission
+policies. Only the explicitly approved OIDC branch trust changed.
 
 ## Local checks
 

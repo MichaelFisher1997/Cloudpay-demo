@@ -2,9 +2,9 @@
 
 This is a summary of recorded deployment evidence, not a fresh AWS inspection.
 
-The intended active branch is now `dev`; deployments remain manual Actions releases
+The active branch is `dev`; deployments remain manual Actions releases
 to the same AWS DEV environment. The branch switch changes no resource or state key.
-Authentication from `dev` awaits the approved [OIDC trust change](aws-oidc.md).
+Authentication from `dev` passed after the approved [OIDC trust change](aws-oidc.md).
 Production stays an undeployed Terraform example/template, with no pipeline.
 
 ## Working demonstration
