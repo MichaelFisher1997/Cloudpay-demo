@@ -57,10 +57,10 @@ Clerk handshake or `currentUser()` Backend API call from the endpoint-only VPC.
 
 ## Approved reset scope
 
-Manual `dev-deploy.yml` **service apply** with `reset_dev_data=true` supplies a
-one-task confirmation override to the migration identity. It is off by default
-and never stored in a standing task definition. After the old web deployment has
-drained, the job atomically empties exactly `images`, `user`, `session`, `account`,
+The historical Clerk cutover supplied a one-task confirmation override to the
+migration identity. That reset input has now been removed from the deployment
+workflow; ordinary releases only run idempotent migrations. After the old web
+deployment drained, the reset job atomically emptied exactly `images`, `user`, `session`, `account`,
 `verification` and `rateLimit` in the dedicated `godiffy` schema, then removes the
 old image-to-local-user foreign key. Unexpected tables/relationships, another
 account/region/DB, production or local connection overrides fail closed.
@@ -95,7 +95,7 @@ client-side check. Both Clerk sign-up/sign-in and the API enforce the restrictio
 
 3. Add the same exact email to `allowedEmails` in `app/clerk/dev.runtime.json`.
    Commit, publish a new image and use the reviewed Actions service release.
-   **Do not set `reset_dev_data=true` for whitelist changes.**
+    Whitelist changes do not require a database reset.
 4. To revoke access, remove it from both layers; existing offline-verified tokens
    can last until their short expiry. Signed download URLs can last two minutes.
 

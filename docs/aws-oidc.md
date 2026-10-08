@@ -1,84 +1,74 @@
-# GitHub Actions AWS OIDC bootstrap
+# GitHub OIDC: proposed DEV branch switch
 
-This setup authenticates `MichaelFisher1997/Cloudpay-demo` to AWS using GitHub
-OpenID Connect and temporary role credentials. It does not provision application
-infrastructure or grant infrastructure deployment permissions.
+**Status:** workflows now target `dev` locally. No live AWS trust, GitHub setting,
+remote branch or infrastructure change has been made. The previously recorded
+trust permits `master` only; it has not been freshly inspected in AWS.
 
-## Resources and scope
+## Exact trust change requiring approval
 
-| Setting | Value |
-| --- | --- |
-| AWS account | `218549829565` |
-| Project region | `eu-west-2` |
-| OIDC provider URL | `https://token.actions.githubusercontent.com` |
-| OIDC audience | `sts.amazonaws.com` |
-| IAM role | `cloudpay-demo-github-actions` |
-| Role ARN | `arn:aws:iam::218549829565:role/cloudpay-demo-github-actions` |
-| Trusted branch | `master` only |
-| Workflow session duration | 900 seconds (15 minutes) |
-| Role maximum session duration | 3600 seconds (IAM's minimum configurable maximum) |
+Target the existing role `arn:aws:iam::218549829565:role/cloudpay-demo-github-actions`.
+Replace just the exact subject condition:
 
-IAM roles and OIDC providers are global resources. The workflow uses `eu-west-2`
-for AWS credential configuration and its STS identity check.
-
-The provider identifies GitHub's token issuer but grants no access by itself.
-The dedicated role's trust policy is recorded in
-[`aws/github-actions-trust-policy.json`](../aws/github-actions-trust-policy.json).
-It permits only `sts:AssumeRoleWithWebIdentity`, with exact audience and subject
-matches. There are no repository or branch wildcards.
-
-GitHub reports `use_immutable_subject: true` for this repository. Its subject is:
-
-```text
-repo:MichaelFisher1997@91565606/Cloudpay-demo@1407927569:ref:refs/heads/master
+```diff
+- repo:MichaelFisher1997@91565606/Cloudpay-demo@1407927569:ref:refs/heads/master
++ repo:MichaelFisher1997@91565606/Cloudpay-demo@1407927569:ref:refs/heads/dev
 ```
 
-The owner and repository IDs bind trust to this repository's identity, not merely
-a potentially reused name. Other repositories, branches, tags, pull-request
-subjects, and environment subjects cannot assume the role. A rename, transfer,
-default-branch change, or OIDC subject customization requires a deliberate review
-of the trust policy and workflow; do not replace these checks with broad wildcards.
+[`aws/github-actions-trust-policy.json`](../aws/github-actions-trust-policy.json)
+contains the complete proposed policy. `Sid` changes to `GitHubActionsDevOnly`
+for clarity; it grants no additional authority.
 
-The role has no attached managed policies and no inline permissions policies.
-AWS STS `GetCallerIdentity` does not require a permission grant, so successful
-authentication can be demonstrated without deployment or general read-only access.
-No IAM users, long-lived access keys, or GitHub AWS credential secrets are needed.
-The role is not used to deploy infrastructure.
+Keep everything else unchanged:
 
-## Workflow
+- Existing federated provider:
+  `arn:aws:iam::218549829565:oidc-provider/token.actions.githubusercontent.com`.
+- Action: `sts:AssumeRoleWithWebIdentity`.
+- Exact `StringEquals` audience: `sts.amazonaws.com`.
+- Exact immutable owner/repository IDs and branch subject; no wildcards, branch
+  list, PR/tag/environment subjects or temporary dual-branch trust.
+- Existing DEV-only permissions, boundaries, role/session settings, resources
+  and Terraform backend keys. No production permission grant.
 
-[`aws-oidc-check.yml`](../.github/workflows/aws-oidc-check.yml) runs manually on
-`master` and on pushes to `master` that change that workflow file.
+This replaces which branch may obtain the existing DEV permissions; it does not
+broaden those permissions. After approval/application, `master` no longer matches.
+`dev` cannot authenticate until the live change is applied. Editing JSON alone
+does not update AWS, and Terraform does not manage this existing OIDC trust.
 
-The job grants only `id-token: write`; all other GitHub token permissions are
-disabled. No checkout is necessary. The official AWS credentials action is pinned
-to the commit for `v6.3.0`, uses GitHub OIDC, requests a 15-minute session, and
-checks that the resulting credentials belong to the expected AWS account.
-The following step runs:
+The immutable subject format comes from the recorded repository configuration.
+Before applying, separately approve read-only inspection of the live trust and
+GitHub OIDC configuration; confirm they still match and preserve unrelated trust
+statements if any. Never print tokens or credentials.
+
+## GitHub setup requiring separate approval
+
+1. Commit the reviewed cleanup/branch changes and publish `dev` (not done here).
+2. Make `dev` the repository's default branch. Manual `workflow_dispatch` workflows
+   must exist on the default branch to be dispatchable; selecting `--ref dev`
+   does not remove that requirement. Keep `master`, but exclude it from active delivery.
+3. Protect `dev`: require PR review and the `validate` status check, restrict direct
+   pushes/bypass where supported. Confirm the actual check name after the first run.
+   YAML triggers do not enforce approvals. No GitHub Environment is added because
+   it would change the OIDC subject and fail this exact branch trust.
+4. Apply only the reviewed AWS trust substitution above, then approve a read-only
+   identity check before any image publication or deployment.
+
+The old OIDC bootstrap guide described an authentication-only role. Later setup
+attached narrowly scoped DEV CI policies; this is now the DEV deployment role,
+not a permissionless identity-test role. Its permissions are unchanged here.
+
+## Existing identity-check workflow
+
+`aws-oidc-check.yml` permits only this repository on `dev`, manually or on pushes
+to `dev` changing that file. It requests `id-token: write`, a 900-second session,
+and runs `sts get-caller-identity`, not Terraform or a deployment. Image publication
+uses 900 seconds; DEV deployment uses 3600 seconds. No permanent AWS keys are used.
+
+After the above approvals, the identity check can be dispatched with:
 
 ```sh
-aws sts get-caller-identity --region eu-west-2 --output json --no-cli-pager
+gh workflow run aws-oidc-check.yml --ref dev --repo MichaelFisher1997/Cloudpay-demo
 ```
 
-The result should show account `218549829565` and an ARN beginning with:
-
-```text
-arn:aws:sts::218549829565:assumed-role/cloudpay-demo-github-actions/cloudpay-oidc-
-```
-
-Caller identity contains identifiers, not credential secrets. Do not add logging
-of OIDC tokens or AWS credentials.
-
-To run the check again:
-
-```sh
-gh workflow run aws-oidc-check.yml --ref master --repo MichaelFisher1997/Cloudpay-demo
-gh run list --workflow aws-oidc-check.yml --repo MichaelFisher1997/Cloudpay-demo
-```
-
-The initial AWS resources are bootstrapped locally using an existing IAM Identity
-Center session, not by this workflow. The trust-policy JSON is an audit record;
-editing it alone does not update the live IAM role. Any future deployment
-permissions must be separately reviewed and scoped to this project. Existing
-shared identity providers and unrelated account resources must not be modified
-as part of this authentication check.
+Expected account: `218549829565`; expected assumed role:
+`cloudpay-demo-github-actions`. An identity check is not proof of permission to
+deploy or of application health. See [delivery](delivery.md) for reviewed releases.

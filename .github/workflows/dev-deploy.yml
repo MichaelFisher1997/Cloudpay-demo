@@ -18,22 +18,6 @@ on:
       expected_fingerprint:
         type: string
         description: Required for apply; copy from reviewed plan run
-      reset_dev_data:
-        type: boolean
-        default: false
-        description: Separately approved Clerk cutover only; empties Godiffy DEV demo tables, not RDS or S3
-      repair_failed_log_group:
-        type: boolean
-        default: false
-        description: Explicit failed-new empty DB-log read repair only; never deletes resources
-      repair_failed_database:
-        type: boolean
-        default: false
-        description: Explicit healthy, uninitialized failed-new DEV DB read repair; never deletes data
-      repair_failed_service:
-        type: boolean
-        default: false
-        description: Explicitly approved healthy failed-new service status-read repair; retains running service
 
 permissions:
   contents: read
@@ -47,7 +31,7 @@ concurrency:
 
 jobs:
   dev:
-    if: github.repository == 'MichaelFisher1997/Cloudpay-demo' && github.ref == 'refs/heads/master'
+    if: github.repository == 'MichaelFisher1997/Cloudpay-demo' && github.ref == 'refs/heads/dev'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
@@ -62,7 +46,6 @@ jobs:
       OPERATION: ${{ inputs.operation }}
       IMAGE_DIGEST: ${{ inputs.image_digest }}
       EXPECTED_FINGERPRINT: ${{ inputs.expected_fingerprint }}
-      RESET_DEV_DATA: ${{ inputs.reset_dev_data }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -85,8 +68,6 @@ jobs:
               raise SystemExit('A real immutable DEV image digest is required')
           if os.environ['OPERATION']=='apply' and not re.fullmatch(r'[a-f0-9]{64}',os.environ['EXPECTED_FINGERPRINT']):
               raise SystemExit('Review a plan run and supply its exact fingerprint before apply')
-          if os.environ['RESET_DEV_DATA']=='true' and (phase!='service' or os.environ['OPERATION']!='apply'):
-              raise SystemExit('Approved data reset is restricted to a service apply')
           release={} if phase=='foundations' else dict(image_digest=digest,bootstrap_enabled=phase=='jobs',bootstrap_retained=True,service_enabled=phase=='service',database_ready=phase=='service')
           if phase=='service':
               clerk=json.loads(Path('app/clerk/dev.runtime.json').read_text())
@@ -110,15 +91,6 @@ jobs:
         run: |
           terraform -chdir=terraform/environments/dev init -input=false -lockfile=readonly -backend-config=backend.hcl
           terraform -chdir=terraform/environments/dev validate
-      - name: Explicitly repair failed-new empty log group state without deletion
-        if: inputs.repair_failed_log_group && inputs.phase == 'foundations'
-        run: python3 scripts/repair-dev-log-state.py
-      - name: Explicitly retain healthy uninitialized failed-new DEV DB
-        if: inputs.repair_failed_database && inputs.phase == 'foundations'
-        run: python3 scripts/repair-dev-db-state.py
-      - name: Explicitly retain the verified healthy failed-new DEV service
-        if: inputs.repair_failed_service && inputs.phase == 'service'
-        run: python3 scripts/repair-dev-service-state.py --image-digest "$IMAGE_DIGEST"
       - name: Require a completed release image scan without critical or high findings
         if: inputs.phase != 'foundations'
         run: |
@@ -164,14 +136,10 @@ jobs:
           python3 scripts/run-dev-job.py bootstrap
           python3 scripts/run-dev-job.py migrate
           python3 scripts/run-dev-job.py verify
-      - name: Migrate Clerk ownership and optionally perform the approved DEV reset
+      - name: Run idempotent database migration
         if: inputs.operation == 'apply' && inputs.phase == 'service'
         run: |
-          if [ "$RESET_DEV_DATA" = true ]; then
-            python3 scripts/run-dev-job.py migrate --reset-dev-data
-          else
-            python3 scripts/run-dev-job.py migrate
-          fi
+          python3 scripts/run-dev-job.py migrate
       - name: Verify private database access using the released image
         if: inputs.operation == 'apply' && inputs.phase == 'service'
         run: python3 scripts/run-dev-job.py verify
@@ -185,7 +153,7 @@ jobs:
           d=json.load(open('../terraform/environments/dev/deployment.json'))
           v=d['deployment']['value']
           with open(os.environ['GITHUB_ENV'],'a') as f:
-              for k,value in dict(APP_URL=v['application_origin'],IMAGE_BUCKET=v['image_bucket_name'],SMOKE_SECRET_ARN=d['smoke_secret_arn']['value']).items():
+              for k,value in dict(APP_URL=v['application_origin'],IMAGE_BUCKET=v['image_bucket_name']).items():
                   f.write(k+'='+value+'\n')
           PY
       - name: Verify deployed Clerk configuration and closed API boundaries

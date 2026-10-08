@@ -12,23 +12,23 @@ run through an explicitly reviewed Actions job, not the local SSO session.
 - Preserve `godiffy-terraform-state-218549829565-eu-west-2`, bootstrap state, native
   locks, production state and both owner-only local pre-migration/state backups.
 - Preserve the existing GitHub OIDC provider, `cloudpay-demo-github-actions` role,
-  immutable master-only trust, `portyard` profile and human SSO role.
+  exact immutable-repository branch trust (the proposed `dev` switch needs separate
+  approval), `portyard` profile and human SSO role.
 - Preserve AWS-managed service-linked roles, including the two approved during DEV
   creation: they are account-level service identities, not DEV Terraform resources.
 - Never include Portyard resources, production, DNS or certificates.
 
 ## 1. Freeze and review
 
-After approval, disable only the three DEV workflows and inspect/cancel any exact
+After approval, disable only the two DEV delivery workflows and inspect/cancel any exact
 DEV queued/running run before retirement; leave credential-free validation enabled:
 
 ```sh
 gh workflow disable dev-deploy.yml --repo MichaelFisher1997/Cloudpay-demo
 gh workflow disable dev-image.yml --repo MichaelFisher1997/Cloudpay-demo
-gh workflow disable dev-verify.yml --repo MichaelFisher1997/Cloudpay-demo
 ```
 
-Prepare a separately reviewed manual retirement workflow on master. It needs an
+Prepare a separately reviewed manual retirement workflow on dev. It needs an
 explicitly approved, temporary **DEV-only** teardown policy: current CI scopes
 deliberately cannot delete infrastructure, policies, buckets or repositories.
 Human SSO may bootstrap that exact policy, not grant AdministratorAccess or edit

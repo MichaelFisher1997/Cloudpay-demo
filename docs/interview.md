@@ -1,86 +1,80 @@
-# Interview notes — evidence, not aspiration
+# Interview study guide
 
-## What is actually deployed
+Focus on explaining the infrastructure you have, not memorising every support
+script. The product is a small named-user image gallery; the assessment is the
+Terraform-managed web service, database, S3 access and Well-Architected decisions.
 
-DEV runs at **http://godiffy-dev-alb-1345285825.eu-west-2.elb.amazonaws.com** in
-account `218549829565`, London. It uses a two-AZ public ALB, private Fargate task,
-private Single-AZ RDS PostgreSQL 17.9 and private versioned S3. Four single-AZ
-interface endpoints plus an S3 gateway replace NAT. The independent six-resource
-state backend retains encryption, versioning, native locking and protected backups.
+Delivery story: **develop on `dev` → PR validation → merge to `dev` → manual AWS DEV
+release**. `master` is inactive for deployment. The production root demonstrates
+module reuse only. The new branch trust is proposed, not yet applied to AWS.
 
-Actual private bootstrap, migration and runtime-verification jobs exited 0.
-They proved RDS-managed initialization, Secrets Manager writes, validated TLS,
-plaintext rejection and restricted runtime SQL/master/migration-secret access.
-Initial service creation reached AWS but Terraform's status reader lacked a
-permission; the healthy original service was retained through an explicitly
-approved guarded Actions repair, not deleted/replaced.
+## Tonight: follow the dependency path
 
-Use [the deployment handoff](dev-deployment.md) for the **current final digest,
-HTTP/S3/recovery results, inventory, costs and remaining gaps**. Do not present a
-candidate image's publication or process-only probes as complete verification.
-All application deployments/image pushes/jobs run in Actions using OIDC; human
-SSO was restricted to reads and narrow DEV policy bootstrap. Production, Portyard,
-DNS and certificates were untouched.
+| Order | Files | What you should be able to explain |
+| --- | --- | --- |
+| 1 | `terraform/bootstrap/main.tf`, `backend.hcl` | State is separate from the application; encryption, versioning, access controls and native `.tflock` locking. |
+| 2 | `terraform/environments/dev/main.tf`, `variables.tf`, `backend.hcl` | Root/provider versus child modules, version pins, account guard, separate environment state and explicit release inputs. |
+| 3 | `terraform/modules/godiffy/main.tf` | Composition: module outputs become other modules' inputs; dev/prod differences; implicit dependencies and explicit networking completion. |
+| 4 | `terraform/modules/networking/main.tf` | Six subnets, public-only internet route, private AWS endpoints, security-group flows and no NAT. |
+| 5 | `terraform/modules/storage/main.tf` | Private, encrypted, versioned S3; exact-origin CORS, TLS-only access and pending-upload lifecycle. |
+| 6 | `terraform/modules/database/main.tf` | Isolated encrypted RDS, managed master password, empty app-secret containers, forced TLS, backups and deletion safeguards. |
+| 7 | `terraform/modules/application/iam.tf` | Trust versus permissions; execution versus runtime versus migration; least privilege and DEV permission boundaries. |
+| 8 | `terraform/modules/application/main.tf` | ECR digest, ALB/IP targets, Fargate task/service, rolling deployments, circuit breaker and autoscaling. |
+| 9 | `.github/workflows/validate.yml`, `dev-image.yml`, `dev-deploy.yml` | No-credential validation, OIDC/STS, immutable images, saved reviewed plans and Terraform ownership of releases. |
+| 10 | `terraform/modules/godiffy/monitoring.tf`, production root | What alarms/backups/HA achieve—and what needs real operational testing. |
 
-The current Clerk image is
-`sha256:0b9490fbfef66443dbca66960709e4a7c2510890b50396423fcaf369915843d1`.
-[Clerk cutover 37700319765](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37700319765)
-applied **3 additions / 1 in-place update / 0 deletions**, completed the approved
-data reset and private DB verification, and finished with **no Terraform changes**.
-Anonymous live Google-only UI/OAuth handoff passed; the owner reported successful
-real Google/gallery/S3 testing and rejection of an unapproved Google account.
-That authenticated proof is manual, not automated. The allowlist is enforced by Clerk and
-independently by the API, without private-task internet egress.
+For each section, answer: **what does it do, why is it needed, what depends on it,
+what can fail, and what alternative would you choose under different requirements?**
 
-The prior password-release image was `sha256:52f132c7cb0264b64da5a6e6075757984c456a17f73e9b13b52bedb6b2852587`,
-with no ECR OS findings. [Release 37691404457](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37691404457)
-applied **8 additions / 1 in-place update / 0 deletions**, passed real auth/private
-S3 ownership/upload/download/delete smoke, and finished with **no Terraform changes**.
-For the interview, lead with modules, remote state/locking, reviewed plan/apply and
-OIDC; the app simply demonstrates that the infrastructure works together.
+## Key decisions to understand
 
-## What can be demonstrated locally
+- **Fargate instead of EC2/Kubernetes:** no host/cluster administration for a small
+  stateless container. ALB routes requests; RDS/S3 retain data across replacements.
+- **Endpoints instead of NAT:** tasks reach the required AWS services privately,
+  but cannot call arbitrary internet APIs. ECR layers also require S3 access.
+  Clerk calls originate in the browser; the server verifies JWTs offline.
+- **Direct S3 transfers:** application authorizes owners and signs bounded access;
+  image bytes do not pass through Fargate. CORS is a browser rule, not authorization.
+- **Separate identities:** execution pulls/logs, runtime accesses app data,
+  migration owns schema changes. Initialization had temporary master access and is
+  now retired. IAM access and PostgreSQL grants are different boundaries.
+- **Terraform owns infrastructure and releases:** autoscaling owns desired count,
+  so only that attribute uses `ignore_changes`. Images are pinned by digest.
+- **Separate dev/prod roots:** same modules, separate state keys and VPCs, not CLI
+  workspaces. They currently share an AWS account, not separate account isolation.
 
-- Cohesive Terraform modules, thin dev/prod roots, pinned versions and **40 mocked tests**.
-- DEV no-delete/fingerprint plans, focused retry records and retained release history;
-  the old 76-addition production plan remains historical/unapplied.
-- TanStack/Bun gallery with offline Clerk bearer verification, exact verified-email
-  restrictions, stable user-ID ownership and direct private version-pinned S3 transfers.
-- 22 unit tests plus 35 Python guard tests; local PG17/built-server HTTP integration with 54 assertions;
-  non-root/read-only amd64 container smoke and zero dependency advisories at scan.
-- Cost comparison, explicit migration/runtime/master separation and runbooks.
-- Actual GitHub [Clerk validation run 37699566022](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37699566022)
-  passed against committed code, including the built server/local PostgreSQL and
-  container checks. It is credential-free validation, not deployed AWS verification.
+## Be explicit about production gaps
 
-Keep local mocks separate from real AWS evidence. ECR OS scanning caught vulnerable
-base packages that the clean app dependency audit did not cover; patches and a
-fail-closed scan gate are part of the release, not a claim of zero security risk.
-Task replacement, full metric/log auditing, automated authenticated-browser testing,
-production failover/load and actual backup restore remain
-separate unverified work. A browserless CORS preflight verifies protocol headers,
-not every browser behavior.
+DEV is a working demonstration, **not a fully production-ready deployment**.
+Public HTTP exposes bearer tokens. Production is undeployed; its configuration
+adds TLS guards, two minimum tasks, dual-AZ endpoints, Multi-AZ RDS and retention.
+Private ALB-to-task traffic remains HTTP. DEV has permission boundaries; the
+production root currently does not pass any. Production identity/approval, DNS,
+Clerk setup, alert delivery and restore/failover/load evidence remain outstanding.
+Health probes are process-only; backups are not proof of a successful restore.
 
-## Architecture rationale to discuss
+## Questions to practise in your own words
 
-For the test's **production-ready Terraform** requirement, show
-[the production configuration walkthrough](production-readiness.md): live Clerk
-inputs now reach ECS, activation gates are regression-tested, and the HA/security
-settings differ deliberately from cheap DEV. Do not confuse deployable configuration
-with completed production OAuth/TLS/CI approvals or measured recovery guarantees.
+1. What is in Terraform state, and how do state locking and workflow concurrency differ?
+2. Why apply a saved plan? What makes a previously reviewed plan unsafe to reuse?
+3. How do private tasks pull ECR images without NAT? What breaks if S3 access disappears?
+4. Does a permissions boundary grant access? How does it constrain CI-created roles?
+5. Why are execution and task roles different? What does `iam:PassRole` permit?
+6. How can browsers access a private S3 bucket without AWS credentials of their own?
+7. Why doesn't Terraform contain the database passwords? How would you rotate them?
+8. What happens if a task crashes, an AZ fails, or PostgreSQL stops responding?
+9. Why ignore desired count but not the task definition? What is your rollback boundary?
+10. Which controls support each of the six Well-Architected pillars, and at what cost?
 
-ALB → private Fargate → private PostgreSQL/S3 keeps the application stateless.
-Direct signed browser transfers avoid streaming image bytes through compute.
-Endpoints remove NAT from the small DEV design, with an explicit service/API and
-one-AZ availability trade-off. Runtime, migrations and initialization have distinct
-DB/IAM privileges; Terraform manages secret containers, not passwords.
+## Supporting material—not the main walkthrough
 
-DEV is deliberately small and temporarily HTTP-only. Production is separately
-designed for two task AZs/replicas, Multi-AZ RDS, dual-AZ endpoints, backups and
-HTTPS approval, but remains undeployed. Clerk and the API enforce verified-email
-allowlisting; that is not a production invitation/audit design. Private ALB-to-task
-HTTP and the public DEV HTTP connection are not end-to-end encryption.
+`ci.tf`, `aws/ci/`, plan auditing and retained task history protect the existing
+DEV deployment. Do not claim these are required by every production service.
+History remains to avoid changing tracked resources; removing it needs reviewed
+state migration. Historical repair/recovery scripts and old password smoke tools
+have been removed. Detailed deployment records are in `docs/archive/`.
 
-Use [architecture.md](architecture.md) for all six Well-Architected pillars and
-[costs.md](costs.md) for the usage-sensitive $100–170/month planned DEV envelope.
-ACM/custom-domain/DNS integration is intentionally postponed and unauthorized.
+Use [DEV status](dev-deployment.md) for evidence, [delivery](delivery.md) for the
+pipeline, [costs](costs.md) for trade-offs and [production readiness](production-readiness.md)
+for launch gates. Local mocks, recorded AWS job results and owner-reported browser
+tests are different kinds of evidence—keep them separate.

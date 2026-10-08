@@ -136,6 +136,8 @@ generic AWS framework. Roots pin the CLI/provider, use an account allowlist, and
 pass a reviewed release digest. The default full-foundation plans do **not** contain
 fake images, service tasks, migration/bootstrap task definitions, or master-access
 roles. A release ECR lookup verifies the digest exists in the dedicated repository.
+DEV supplies human-controlled task permission boundaries; the production root
+currently supplies none, so do not present boundaries as a shared production control.
 Use the default Terraform workspace only: dev/prod are separate roots and state
 keys, not CLI workspaces. Future scoped backend IAM must reject alternative paths.
 Only desired task count is ignored for autoscaling; Terraform owns task definitions
@@ -148,7 +150,9 @@ key/issuer mismatches are rejected. See [production readiness](production-readin
 for tested guards and remaining launch evidence. Terraform booleans are not organizational approval
 boundaries: IAM/GitHub Environment protections must enforce that separately.
 DEV-only OIDC delivery is enabled and tested; no production deployment authority
-was granted. See [delivery](delivery.md).
+was granted under the historical master-branch flow. The intended active branch is
+now `dev`; that exact OIDC trust change still needs approval. Production remains a
+module-reuse example/template, without a deployment pipeline. See [delivery](delivery.md).
 
 ## Six Well-Architected pillars
 

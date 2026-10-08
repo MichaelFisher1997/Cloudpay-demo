@@ -2,7 +2,7 @@
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "GitHubActionsMasterOnly",
+      "Sid": "GitHubActionsDevOnly",
       "Effect": "Allow",
       "Principal": {
         "Federated": "arn:aws:iam::218549829565:oidc-provider/token.actions.githubusercontent.com"
@@ -11,7 +11,7 @@
       "Condition": {
         "StringEquals": {
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
-          "token.actions.githubusercontent.com:sub": "repo:MichaelFisher1997@91565606/Cloudpay-demo@1407927569:ref:refs/heads/master"
+          "token.actions.githubusercontent.com:sub": "repo:MichaelFisher1997@91565606/Cloudpay-demo@1407927569:ref:refs/heads/dev"
         }
       }
     }

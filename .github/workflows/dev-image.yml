@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   image:
-    if: github.repository == 'MichaelFisher1997/Cloudpay-demo' && github.ref == 'refs/heads/master'
+    if: github.repository == 'MichaelFisher1997/Cloudpay-demo' && github.ref == 'refs/heads/dev'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:

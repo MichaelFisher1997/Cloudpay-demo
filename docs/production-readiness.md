@@ -2,6 +2,12 @@
 
 ## Scope and status
 
+`terraform/environments/prod/` is retained as an **undeployed example/template**
+showing how the same modules support stronger production settings. There is no
+production pipeline in this assessment. Active development and manual delivery
+use `dev` and the existing AWS DEV environment; `master` is not a release branch.
+The launch gates below are future considerations, not work required for the demo.
+
 The Terraform configures a web service, PostgreSQL backend and private S3 access.
 DEV is deployed and tested. Production uses the same modules with stronger
 availability settings and explicit activation gates; it is **not deployed or

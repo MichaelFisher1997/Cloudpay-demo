@@ -11,7 +11,6 @@
     "db:migrate": "bun scripts/migrate.ts",
     "db:bootstrap": "bun scripts/bootstrap.ts",
     "db:verify": "bun scripts/verify-db.ts",
-    "smoke:aws": "bun scripts/aws-smoke.ts",
     "smoke:clerk": "bun scripts/clerk-smoke.ts",
     "test:built": "bun run build && bun scripts/test-built.ts",
     "format": "prettier --write src scripts tests vite.config.ts",

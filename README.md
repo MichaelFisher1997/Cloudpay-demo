@@ -1,117 +1,93 @@
-# Godiffy — CloudPay platform assessment
+# Godiffy — CloudPay Terraform assessment
 
-A small **Terraform interview demo**. The photo gallery proves the AWS resources
-work together; the emphasis is modules, remote state, reviewed plans, IAM and
-GitHub Actions delivery—not application complexity or production certification.
+A small image gallery demonstrating the assessment: **an AWS web service with a
+PostgreSQL backend and access to a private S3 bucket**, managed with Terraform.
+The infrastructure is the focus; the application proves the components work together.
 
-## Current status
+## Architecture
 
-**Clerk DEV is deployed:** Google-only sign-in and an exact verified-email
-allowlist replace local passwords. The approved demo-data reset completed;
-S3 objects/versions were preserved. [Access and verification status](docs/clerk-dev.md).
-
-- **Deployed and verified:** dedicated Godiffy S3 Terraform backend, native state
-  locking, versioning, encryption, and six bootstrap resources. Local backups retained.
-- **DEV is running:** [HTTP ALB URL](http://godiffy-dev-alb-1345285825.eu-west-2.elb.amazonaws.com).
-  [Clerk release 37700319765](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/37700319765)
-  applied **3 additions, 1 in-place update, 0 deletions**; reset/migration, DB
-  verification and anonymous auth-boundary smoke passed; final plan **no changes**.
-  Google-only live UI/OAuth handoff passed. The owner also reported successful
-  Google login and image upload/download/delete, plus unapproved-account rejection.
-- **Production remains undeployed:** its historical 76-addition foundation plan
-  is design evidence, not authorization or a current apply input.
-  The production root now supports live Clerk configuration with fail-closed
-  activation tests; [production inputs and interview walkthrough](docs/production-readiness.md)
-  separate code readiness from launch approvals and unmeasured operational targets.
-- No Portyard application infrastructure, production application resources or DNS
-  records were changed.
-- **DEV-only Actions delivery:** Nine exact DEV
-  policies (five CI scopes and four task boundaries) were human-bootstrapped onto
-  the deliberately reused OIDC role; its trust/profile are unchanged. Application
-  deployment uses manual plan/apply/image Actions workflows only.
-  See [dev deployment status](docs/dev-deployment.md).
-- Plans/state/dependencies and all credentials are excluded from Git.
-- **GitHub validation:** [latest credential-free CI](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/workflows/validate.yml)
-  tests/builds the actual committed implementation without AWS credentials.
-
-DEV is intentionally HTTP-only: use non-sensitive images. Google credentials
-stay on Google's HTTPS pages, but gallery session tokens still cross HTTP.
-Production and domain/TLS work remain unauthorized. Do not interpret process-only
-health probes, local mocks or a scan as proof of production readiness.
-
-## Five-minute interview demo
-
-1. Open the site and use **Google sign-in** with an
-   allowlisted email; upload/download/delete a non-sensitive image. Add interviewers
-   individually using [the DEV access guide](docs/clerk-dev.md).
-2. Walk through `terraform/environments/dev` and the focused modules in
-   `terraform/modules`: networking, storage, database and application.
-3. Show the Actions release's reviewed plan, successful apply and final **no-change**
-   plan. The app is evidence of the infrastructure, not the main presentation.
-4. Explain S3 remote state/native locking, private tasks/RDS, separate task roles,
-   OIDC without permanent keys, and the deliberate one-task/Single-AZ cost trade-off.
-5. State the estimated **$100–170/month** envelope and separately approved
-    [teardown](docs/teardown.md). Production, load/restore and task-recovery testing
-    are not claimed; authenticated browser proof is the owner's manual report.
-
-## Design in brief
-
-```mermaid
-flowchart LR
-  Browser <-->|Google sign-in over HTTPS| Clerk[Clerk DEV]
-  Browser -->|HTTP DEV / HTTPS production design| ALB[Public ALB: two AZs]
-  ALB -->|Private port 3000| ECS[Private ECS Fargate]
-  ECS -->|Verified PostgreSQL TLS| RDS[Private RDS PostgreSQL]
-  ECS -->|Task IAM / HTTPS| SM[Secrets Manager]
-  ECS -->|Authorize ownership and sign access| S3[Private versioned S3]
-  Browser <-->|Short-lived signed HTTPS image transfers| S3
-  ECS --> CW[CloudWatch logs and alarms]
+```text
+Browser → public ALB → private ECS Fargate → isolated RDS PostgreSQL
+                         ├── Secrets Manager (runtime DB credentials)
+                         └── private S3 (authorize and sign image access)
+Browser ↔ S3 over HTTPS using short-lived presigned requests
 ```
 
-Dev intentionally has one task, Single-AZ RDS, and one endpoint AZ. Production is
-designed for two task AZs, two minimum replicas, Multi-AZ RDS, and endpoints in both
-AZs. There are no NAT gateways, public task IPs, Redis or Kubernetes in DEV.
-Clerk authentication is browser-side; the private task verifies tokens offline.
+London (`eu-west-2`), two-AZ VPC, separate public/application/database subnets.
+AWS endpoints replace NAT. Clerk Google authentication runs in the browser;
+the server verifies tokens offline and checks ownership and verified-email access.
 
-## Review and operate
+## Start here for the interview
 
-| Document | Purpose |
-| --- | --- |
-| [Architecture](docs/architecture.md) | Boundaries, modules, decisions and six Well-Architected pillars |
-| [Historical review](docs/review.md) | Earlier build-and-plan evidence, not the current inventory |
-| [DEV handoff](docs/dev-deployment.md) | Actual inventory, digest, AWS results and verification limits |
-| [Interview notes](docs/interview.md) | What is actually deployed versus tested locally or only designed |
-| [Production readiness](docs/production-readiness.md) | Requirements, required inputs, tested activation gates and remaining launch evidence |
-| [Costs](docs/costs.md) | Official London prices, assumptions and endpoint/NAT comparison |
-| [Operations](docs/operations.md) | Staged deployment, verification, rollback, recovery and TLS last |
-| [Delivery security](docs/delivery.md) | Actions-only DEV rollout, IAM limits and separate production approvals |
-| [DEV teardown](docs/teardown.md) | Exact retirement scope, data/protection safeguards and separate approval |
-| [State backend](docs/terraform-state.md) | Live backend, migration record, locking and access controls |
-| [Application](app/README.md) | Runtime/job contracts, local tests and known security limits |
-| [OIDC bootstrap](docs/aws-oidc.md) | Original identity bootstrap; DEV delivery scope is recorded separately |
+1. [Study guide](docs/interview.md): file order, key decisions and practice questions.
+2. [Architecture](docs/architecture.md): networking, security and Well-Architected trade-offs.
+3. [Delivery](docs/delivery.md): validation → immutable image → reviewed Terraform release.
+4. [Production readiness](docs/production-readiness.md): what is defined versus unfinished.
 
-## Local verification
+## Development and deployment workflow
 
-Terraform `1.16.5`, AWS provider `6.67.0`, Bun `1.4.2`, Python 3 and Docker.
-The existing Nix shell provides AWS CLI, Terraform, actionlint and ShellCheck.
+**Develop on `dev` → PR checks → merge to `dev` → deploy to AWS DEV.**
+
+- `dev` is the active development/integration branch. Use short-lived feature
+  branches for PRs targeting `dev`; validation also runs on pushes to `dev`.
+- After review and merge, manually run the image workflow on `dev`, then the DEV
+  deployment workflow: reviewed `service` plan followed by an explicit apply.
+  Merging does not automatically change AWS infrastructure.
+- `master` is not part of the active workflow. The branch name does not select
+  a Terraform environment: deployment still uses `terraform/environments/dev/`
+  and the existing DEV state key, role and resource names.
+- `terraform/environments/prod/` is an undeployed example/template of module reuse;
+  there is no production pipeline.
+
+**Activation pending:** these are local changes. Publishing `dev`, making it the
+GitHub default branch with required PR checks/review, and replacing the role's
+exact OIDC branch subject require separate approval. The trust-policy JSON is a
+proposal, not an applied AWS change. See [OIDC approval details](docs/aws-oidc.md).
+
+```text
+terraform/bootstrap/               Protected S3 state backend and native locking
+terraform/environments/dev/        Deployed demo root and separate state key
+terraform/environments/prod/       Production example/template; no deployment pipeline
+terraform/modules/godiffy/         Composition, environment settings and alarms
+terraform/modules/networking/      VPC, subnets, routes, security groups and endpoints
+terraform/modules/storage/         Private versioned images; production ALB logs
+terraform/modules/database/        RDS, backups and secret containers
+terraform/modules/application/     ECR, ALB, ECS, task IAM and autoscaling
+.github/workflows/                 Validation, OIDC check and manual DEV delivery
+app/                              Small containerised gallery
+```
+
+## Deployment status and trade-offs
+
+**DEV runs:** http://godiffy-dev-alb-1345285825.eu-west-2.elb.amazonaws.com
+
+- One task, Single-AZ RDS and one endpoint AZ deliberately reduce demo cost.
+- **HTTP-only DEV is not production-ready.** Gallery bearer tokens cross HTTP;
+  use non-sensitive images. Custom domains and HTTPS are outstanding.
+- Production is **not deployed**. Its configuration adds two minimum tasks,
+  dual-AZ endpoints, Multi-AZ RDS, longer retention and TLS activation guards.
+- ALB-to-task traffic remains HTTP in both designs. Restore/failover/load testing
+  and confirmed alert delivery are not claimed.
+- DEV cost estimate: **$100–170/month**, not a measured bill or hard cap.
+
+See [DEV evidence](docs/dev-deployment.md), [costs](docs/costs.md) and
+[Clerk access](docs/clerk-dev.md). Historical delivery records are in `docs/archive/`;
+they are not required study. Existing task-history/state compatibility controls
+remain; cleanup has not changed Terraform resources, AWS infrastructure or IAM.
+
+## Local checks
+
+Terraform 1.16.5, AWS provider 6.67.0, Bun 1.4.2, Python 3 and Docker.
+The Nix shell supplies Terraform, actionlint and ShellCheck.
 
 ```sh
 nix-shell
 bash scripts/verify.sh
-bun scripts/test-database.ts
 cd app
 bun run test:built
-cd ..
-actionlint .github/workflows/*.yml
-shellcheck scripts/verify.sh
 ```
 
-`verify.sh` isolates cached backend metadata, disables backend initialization and
-uses mocked AWS providers only;
-it does not need AWS credentials. The PostgreSQL test runs an isolated local
-container with ephemeral credentials and mocked AWS services, then stops only its
-own container. Docker build context is `app/`.
-
-Production remains undeployed; DEV Google sign-in requires a verified email on
-the exact allowlist. Actual AWS image-pull, database, S3 and ALB verification
-is recorded separately from local tests in the deployment handoff.
+These use mock AWS/local PostgreSQL, not deployment credentials. Dependency/provider
+installation may need internet access. Plans, state, backups and secrets must never
+be committed. Deployments require explicit review; [operations](docs/operations.md)
+and [teardown](docs/teardown.md) are reference runbooks, not authorization.

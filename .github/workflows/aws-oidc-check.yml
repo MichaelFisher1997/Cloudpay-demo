@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - master
+      - dev
     paths:
       - .github/workflows/aws-oidc-check.yml
 
@@ -13,7 +13,7 @@ permissions: {}
 jobs:
   aws-identity:
     name: Verify AWS identity via OIDC
-    if: github.repository == 'MichaelFisher1997/Cloudpay-demo' && github.ref == 'refs/heads/master'
+    if: github.repository == 'MichaelFisher1997/Cloudpay-demo' && github.ref == 'refs/heads/dev'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

@@ -1,9 +1,7 @@
-import copy
 import importlib.util
 import json
 from pathlib import Path
 import unittest
-from datetime import datetime, timezone
 from unittest.mock import patch
 
 
@@ -16,11 +14,7 @@ def load(filename):
 
 audit_module = load("check-dev-plan.py")
 policies_module = load("ci-policies.py")
-repair_module = load("repair-dev-log-state.py")
-verify_module = load("verify-dev.py")
-db_repair_module = load("repair-dev-db-state.py")
 job_module = load("run-dev-job.py")
-service_repair_module = load("repair-dev-service-state.py")
 scan_module = load("check-image-scan.py")
 revision_module = load("retain-dev-revisions.py")
 
@@ -145,72 +139,6 @@ class DevDeliveryTests(unittest.TestCase):
         self.assertTrue(all("/godiffy-dev-cluster/godiffy-dev-web" in arn for arn in deployment["Resource"]))
 
 
-class EmptyLogRepairTests(unittest.TestCase):
-    def run_repair(self, *, tainted=True, streams=False, owned=True, recent=True):
-        state = {"resources": [{"module": "module.godiffy.module.database", "type": "aws_cloudwatch_log_group", "name": "postgresql", "instances": [{"status": "tainted" if tainted else "ready", "attributes": {"name": repair_module.NAME}}]}]}
-        responses = [
-            {"Account": "218549829565", "Arn": "arn:aws:sts::218549829565:assumed-role/cloudpay-demo-github-actions/test"},
-            {"logGroups": [{"logGroupName": repair_module.NAME, "creationTime": datetime.now(timezone.utc).timestamp() * 1000 if recent else 0, "storedBytes": 0}]},
-            {"tags": repair_module.TAGS if owned else {}},
-            {"logStreams": [{"logStreamName": "existing"}] if streams else []},
-        ]
-        with patch.object(repair_module, "read", return_value=state), patch.object(repair_module, "aws", side_effect=responses), patch.object(repair_module.subprocess, "run") as mutate:
-            if tainted and not streams and owned and recent:
-                repair_module.main()
-                mutate.assert_called_once_with(["terraform", "-chdir=terraform/environments/dev", "untaint", repair_module.ADDRESS], check=True, timeout=120)
-            else:
-                with self.assertRaises(RuntimeError):
-                    repair_module.main()
-                mutate.assert_not_called()
-
-    def test_only_failed_new_empty_owned_resource_is_retained(self):
-        self.run_repair()
-
-    def test_refuses_ordinary_nonempty_unowned_or_old_resource(self):
-        for options in ({"tainted": False}, {"streams": True}, {"owned": False}, {"recent": False}):
-            self.run_repair(**options)
-
-
-class LogSampleTests(unittest.TestCase):
-    def test_detects_credentials_sql_and_signed_urls_without_printing_them(self):
-        for message in ("password: disposable", "auth_secret=fixture", "https://example.invalid/?X-Amz-Signature=fixture", "ALTER ROLE fixture PASSWORD 'disposable';", "ASIA1234567890123456"):
-            self.assertIsNotNone(verify_module.SECRET_PATTERN.search(message))
-        for message in ("Schema migrated", "Request failed", "Runtime role denied master and migration secrets: PASS"):
-            self.assertIsNone(verify_module.SECRET_PATTERN.search(message))
-
-
-class EmptyDatabaseRepairTests(unittest.TestCase):
-    def run_repair(self, *, initialized=False, recent=True, jobs=False, task=False):
-        state = {"resources": [{"module": "module.godiffy.module.database", "type": "aws_db_instance", "name": "this", "instances": [{"status": "tainted", "attributes": {"identifier": db_repair_module.NAME}}]}]}
-        if jobs:
-            state["resources"].append({"type": "aws_ecs_task_definition"})
-        database = {"InstanceCreateTime": datetime.now(timezone.utc).isoformat() if recent else "2000-01-01T00:00:00+00:00", "DBInstanceStatus": "available", "DBName": "godiffy", "DBInstanceClass": "db.t4g.micro", "PubliclyAccessible": False, "MultiAZ": False, "StorageEncrypted": True, "DeletionProtection": True, "DBInstanceArn": "arn:aws:rds:eu-west-2:218549829565:db:godiffy-dev-postgres"}
-        responses = [
-            {"Account": "218549829565", "Arn": "arn:aws:sts::218549829565:assumed-role/cloudpay-demo-github-actions/test"},
-            {"DBInstances": [database]},
-            {"TagList": [{"Key": key, "Value": value} for key, value in db_repair_module.TAGS.items()]},
-            {"VersionIdsToStages": {"fixture": ["AWSCURRENT"]} if initialized else {}},
-            {"VersionIdsToStages": {}},
-            {"taskArns": ["fixture"] if task else []},
-            {"taskArns": []},
-        ]
-        with patch.object(db_repair_module, "read", return_value=state), patch.object(db_repair_module, "aws", side_effect=responses), patch.object(db_repair_module.subprocess, "run") as mutate:
-            if not initialized and recent and not jobs and not task:
-                db_repair_module.main()
-                mutate.assert_called_once_with(["terraform", "-chdir=terraform/environments/dev", "untaint", db_repair_module.ADDRESS], check=True, timeout=120)
-            else:
-                with self.assertRaises(RuntimeError):
-                    db_repair_module.main()
-                mutate.assert_not_called()
-
-    def test_retains_only_failed_new_uninitialized_db(self):
-        self.run_repair()
-
-    def test_refuses_initialized_old_or_previously_run_application(self):
-        for options in ({"initialized": True}, {"recent": False}, {"jobs": True}, {"task": True}):
-            self.run_repair(**options)
-
-
 class ActionsJobTests(unittest.TestCase):
     def test_reset_is_opt_in_migration_override_only(self):
         self.assertEqual(job_module.job_overrides("migrate", False), {})
@@ -228,41 +156,6 @@ class ActionsJobTests(unittest.TestCase):
                 job_module.validate_target(target, {**identity, "Arn": arn})
         with self.assertRaises(RuntimeError):
             job_module.validate_target({**target, "environment": "prod"}, identity)
-
-
-class HealthyServiceRepairTests(unittest.TestCase):
-    def run_repair(self, *, tainted=True, original=True, owned=True, image=True, private=True, healthy=True, actions=True, exact=True):
-        m = service_repair_module
-        digest = "sha256:" + "a" * 64
-        definition = f"arn:aws:ecs:{m.REGION}:{m.ACCOUNT}:task-definition/{m.SERVICE}:1"
-        network = {"task_subnet_ids": ["subnet-fixture"], "task_security_group": "sg-fixture"}
-        state = {"resources": [
-            {"module": "module.godiffy.module.application", "type": "aws_ecs_service", "name": "this", "instances": [{"index_key": 0, "status": "tainted" if tainted else "ready", "attributes": {"id": m.SERVICE_ARN if exact else "arn:aws:ecs:eu-west-2:218549829565:service/portyard/web"}}]},
-            {"module": "module.godiffy.module.application", "type": "aws_ecs_task_definition", "name": "web", "instances": [{"index_key": digest, "attributes": {"arn": definition}}]},
-        ], "outputs": {"deployment": {"value": {"account_id": m.ACCOUNT, "region": m.REGION, "environment": "dev", "image_digest": digest, **network}}}}
-        service = {"createdAt": m.APPROVED_CREATION.isoformat() if original else "2000-01-01T00:00:00+00:00", "serviceArn": m.SERVICE_ARN, "clusterArn": m.CLUSTER_ARN, "status": "ACTIVE", "tags": [{"key": key, "value": value} for key, value in m.TAGS.items()] if owned else [], "desiredCount": 1, "runningCount": 1, "pendingCount": 0, "taskDefinition": definition, "launchType": "FARGATE", "enableExecuteCommand": False, "deployments": [{"status": "PRIMARY", "rolloutState": "COMPLETED"}], "networkConfiguration": {"awsvpcConfiguration": {"assignPublicIp": "DISABLED" if private else "ENABLED", "subnets": network["task_subnet_ids"], "securityGroups": [network["task_security_group"]]}}, "loadBalancers": [{"containerName": "web", "containerPort": 3000, "targetGroupArn": f"arn:aws:elasticloadbalancing:{m.REGION}:{m.ACCOUNT}:targetgroup/godiffy-dev-app/fixture"}]}
-        task = {"group": f"service:{m.SERVICE}", "taskDefinitionArn": definition, "lastStatus": "RUNNING", "healthStatus": "HEALTHY", "containers": [{"name": "web", "imageDigest": digest if image else "sha256:" + "b" * 64}], "attachments": [{"details": [{"name": "networkInterfaceId", "value": "eni-fixture"}]}]}
-        responses = [
-            {"Account": m.ACCOUNT, "Arn": f"arn:aws:sts::{m.ACCOUNT}:assumed-role/" + ("cloudpay-demo-github-actions/test" if actions else "AWSReservedSSO_PortyardAdministrator_fixture/michael")},
-            {"services": [service]}, {"taskArns": [f"arn:aws:ecs:{m.REGION}:{m.ACCOUNT}:task/{m.CLUSTER}/fixture"]}, {"tasks": [task]},
-            {"NetworkInterfaces": [{"SubnetId": network["task_subnet_ids"][0], "Groups": [{"GroupId": network["task_security_group"]}], "PrivateIpAddress": "10.42.10.10"}]},
-            {"TargetHealthDescriptions": [{"Target": {"Id": "10.42.10.10"}, "TargetHealth": {"State": "healthy" if healthy else "unhealthy"}}]},
-        ]
-        with patch.object(m, "read", return_value=state), patch.object(m, "aws", side_effect=responses), patch.object(m.subprocess, "run") as mutate:
-            if all((tainted, original, owned, image, private, healthy, actions, exact)):
-                m.main(digest)
-                mutate.assert_called_once_with(["terraform", "-chdir=terraform/environments/dev", "untaint", m.ADDRESS], check=True, timeout=120)
-            else:
-                with self.assertRaises(RuntimeError):
-                    m.main(digest)
-                mutate.assert_not_called()
-
-    def test_only_verified_exact_healthy_failed_read_service_is_retained(self):
-        self.run_repair()
-
-    def test_refuses_ordinary_other_creation_unowned_public_wrong_image_or_unhealthy_service(self):
-        for key in ("tainted", "original", "owned", "image", "private", "healthy", "actions", "exact"):
-            self.run_repair(**{key: False})
 
 
 class ImageScanTests(unittest.TestCase):
@@ -291,7 +184,7 @@ class ImageScanTests(unittest.TestCase):
 
     def test_actions_tee_pipelines_use_bash_pipefail(self):
         root = Path(__file__).parents[2]
-        for name in ("dev-deploy.yml", "dev-image.yml", "dev-verify.yml"):
+        for name in ("dev-deploy.yml", "dev-image.yml"):
             workflow = (root / ".github/workflows" / name).read_text()
             self.assertIn("defaults:\n  run:\n    shell: bash", workflow)
 
@@ -317,16 +210,48 @@ class RevisionHistoryTests(unittest.TestCase):
                 revision_module.revision_inputs(state)
 
 
-class RecoveryHealthTests(unittest.TestCase):
-    def test_waits_for_container_and_exact_replacement_target_health(self):
-        digest = "sha256:" + "a" * 64
-        task = {"taskArn": "replacement", "containers": [{"imageDigest": digest}], "healthStatus": "HEALTHY", "attachments": [{"details": [{"name": "privateIPv4Address", "value": "10.42.10.10"}]}]}
-        read_health = unittest.mock.Mock(side_effect=[[{"TargetHealth": {"State": "initial"}}], [{"TargetHealth": {"State": "healthy"}}]])
-        with patch.object(verify_module.time, "sleep"):
-            self.assertEqual(verify_module.wait_replacement(lambda: task, read_health, "old", digest, attempts=2), task)
-        read_health.assert_called_with("10.42.10.10")
-        with patch.object(verify_module.time, "sleep"):
-            with self.assertRaises(RuntimeError):
-                verify_module.wait_replacement(lambda: task, lambda ip: [{"TargetHealth": {"State": "initial"}}], "old", digest, attempts=2)
-        with self.assertRaises(RuntimeError):
-            verify_module.wait_replacement(lambda: task, lambda ip: [], "old", "sha256:" + "b" * 64)
+class SimplifiedWorkflowTests(unittest.TestCase):
+    def test_validation_targets_dev_without_aws_credentials(self):
+        root = Path(__file__).parents[2]
+        workflow = (root / ".github/workflows/validate.yml").read_text()
+        self.assertIn("  pull_request:\n    branches: [dev]", workflow)
+        self.assertIn("  push:\n    branches: [dev]", workflow)
+        self.assertNotIn("master", workflow)
+        self.assertNotIn("id-token: write", workflow)
+        self.assertNotIn("configure-aws-credentials", workflow)
+
+    def test_aws_workflows_allow_only_dev_and_keep_existing_role(self):
+        root = Path(__file__).parents[2]
+        for name in ("dev-deploy.yml", "dev-image.yml", "aws-oidc-check.yml"):
+            workflow = (root / ".github/workflows" / name).read_text()
+            self.assertIn("github.repository == 'MichaelFisher1997/Cloudpay-demo' && github.ref == 'refs/heads/dev'", workflow)
+            self.assertIn("role-to-assume: arn:aws:iam::218549829565:role/cloudpay-demo-github-actions", workflow)
+            self.assertNotIn("refs/heads/master", workflow)
+            self.assertNotIn("terraform/environments/prod", workflow)
+
+    def test_proposed_oidc_trust_is_exact_dev_subject_without_more_permissions(self):
+        root = Path(__file__).parents[2]
+        policy = json.loads((root / "aws/github-actions-trust-policy.json").read_text())
+        self.assertEqual(policy, {
+            "Version": "2012-10-17",
+            "Statement": [{
+                "Sid": "GitHubActionsDevOnly",
+                "Effect": "Allow",
+                "Principal": {"Federated": "arn:aws:iam::218549829565:oidc-provider/token.actions.githubusercontent.com"},
+                "Action": "sts:AssumeRoleWithWebIdentity",
+                "Condition": {"StringEquals": {
+                    "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+                    "token.actions.githubusercontent.com:sub": "repo:MichaelFisher1997@91565606/Cloudpay-demo@1407927569:ref:refs/heads/dev",
+                }},
+            }],
+        })
+
+    def test_service_release_preserves_history_without_historical_repair_or_reset(self):
+        root = Path(__file__).parents[2]
+        workflow = (root / ".github/workflows/dev-deploy.yml").read_text()
+        self.assertIn("python3 scripts/retain-dev-revisions.py", workflow)
+        self.assertIn("python3 scripts/check-dev-plan.py", workflow)
+        self.assertIn("python3 scripts/run-dev-job.py migrate", workflow)
+        for obsolete in ("repair_failed_", "repair-dev-", "reset_dev_data", "--reset-dev-data", "SMOKE_SECRET_ARN"):
+            self.assertNotIn(obsolete, workflow)
+        self.assertFalse((root / ".github/workflows/dev-verify.yml").exists())

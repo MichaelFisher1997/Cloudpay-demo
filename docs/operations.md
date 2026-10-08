@@ -1,5 +1,10 @@
 # Godiffy operations and staged rollout
 
+The intended active branch is `dev`; `master` is not used for deployment.
+Before dispatching from `dev`, publish the branch and obtain approval for the exact
+[OIDC trust update and GitHub settings](aws-oidc.md). No live change is implied by
+this runbook. Production remains an undeployed example/template.
+
 **Use the user's current authorization, not this runbook as blanket permission.**
 DEV-only deployment is now approved within the small-dev design and **must run
 from GitHub Actions**. Human SSO is limited to read-only verification and narrowly
@@ -25,7 +30,7 @@ prepare/review a staged code change; do not normalize routine `-target` deployme
 From repository root, dispatch the DEV-only workflow:
 
 ```sh
-gh workflow run dev-deploy.yml --ref master -f phase=foundations -f operation=plan
+gh workflow run dev-deploy.yml --ref dev -f phase=foundations -f operation=plan
 gh run view <returned-run-id> --log
 ```
 
@@ -42,7 +47,7 @@ If SSO expires, renew the existing profile; do not replace it or create AWS keys
 After review within current DEV authorization, copy the exact reported fingerprint:
 
 ```sh
-gh workflow run dev-deploy.yml --ref master -f phase=foundations -f operation=apply \
+gh workflow run dev-deploy.yml --ref dev -f phase=foundations -f operation=apply \
   -f expected_fingerprint=<reviewed-plan-fingerprint>
 ```
 
@@ -70,8 +75,8 @@ retained initial Debian digest with known severe findings; select a scan-clean a
 Dispatch the job-definition plan with the actual reported digest:
 
 ```sh
-gh workflow run dev-image.yml --ref master
-gh workflow run dev-deploy.yml --ref master -f phase=jobs -f operation=plan \
+gh workflow run dev-image.yml --ref dev
+gh workflow run dev-deploy.yml --ref dev -f phase=jobs -f operation=plan \
   -f image_digest=<actual-DEV-ECR-manifest-digest>
 ```
 
@@ -112,8 +117,8 @@ retired-bootstrap/ready-database inputs and public Clerk DEV configuration, incl
 the named-email API allowlist. Review the saved plan and supply its fingerprint.
 The private runtime verifier runs before apply. After the service reaches steady
 state and drains legacy auth, Actions migrates ownership and reruns DB verification
-and Clerk boundary smoke. Only the separately approved first cutover sets
-`reset_dev_data=true`; ordinary releases must leave it false. Until separately
+and Clerk boundary smoke. The first cutover's reset input has been removed;
+ordinary releases never request a data reset. Until separately
 authorized TLS integration, use only the existing HTTP ALB hostname.
 
 Check:
