@@ -22,7 +22,7 @@ Runtime preflight also checks the public RSA key and prohibits HTTP/local DB
 overrides. Tests use mock AWS and ephemeral local signing keys, not real production
 credentials. No `CLERK_SECRET_KEY` is required or passed to ECS.
 
-Local validation of this pass: **40 Terraform mock runs, 35 Python guard tests,
+Historical validation before repository simplification: **40 Terraform mock runs, 35 Python guard tests,
 22 app unit tests and 54 PostgreSQL/built-server assertions** passed, alongside
 format/type checks, Actions/ShellCheck, a zero-advisory dependency audit and the
 amd64 container build. Read-only/non-root container checks verified both valid

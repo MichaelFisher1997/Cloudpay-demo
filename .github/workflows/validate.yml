@@ -31,10 +31,26 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: 1.4.2
-      - name: Terraform mock tests and application validation
+      - name: Terraform checks (no AWS backend)
         env:
           TF_PLUGIN_CACHE_DIR: ${{ runner.temp }}/godiffy-terraform-cache
-        run: bash scripts/verify.sh
+        run: |
+          mkdir -p "$TF_PLUGIN_CACHE_DIR"
+          terraform fmt -check -recursive terraform
+          for directory in terraform/bootstrap terraform/environments/{dev,prod} terraform/modules/*; do
+            export TF_DATA_DIR="$RUNNER_TEMP/terraform/${directory//\//-}"
+            mkdir -p "$TF_DATA_DIR"
+            terraform -chdir="$directory" init -backend=false -input=false -lockfile=readonly
+            terraform -chdir="$directory" validate
+            terraform -chdir="$directory" test
+          done
+      - name: Application checks
+        working-directory: app
+        run: |
+          bun install --frozen-lockfile
+          bun run format:check
+          bun run typecheck
+          bun run test
       - name: PostgreSQL and built-server HTTP integration (local only)
         working-directory: app
         run: bun run test:built
@@ -44,4 +60,4 @@ jobs:
       - name: Build application image without pushing
         run: docker build --platform linux/amd64 --tag godiffy:validation app
       - name: Read-only non-root image smoke and production config guards
-        run: bun scripts/smoke-image.ts godiffy:validation
+        run: bun app/scripts/smoke-image.ts godiffy:validation

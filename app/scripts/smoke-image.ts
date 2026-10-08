@@ -1,6 +1,6 @@
 // No AWS calls or credentials. Inspect only our locally built image and own containers.
 import { generateKeyPairSync, randomBytes } from "node:crypto";
-import clerk from "../app/clerk/dev.runtime.json";
+import clerk from "../clerk/dev.runtime.json";
 
 const image = process.argv[2] ?? "godiffy:validation";
 if (!/^godiffy:(validation|local|final)$/.test(image))

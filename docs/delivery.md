@@ -1,77 +1,57 @@
-# Delivery: validation, image, reviewed release
+# Simple DEV delivery
 
-**Work and push directly on `dev` → validate → manually deploy to existing AWS DEV.**
-Code promotion is a PR **from `dev` into protected `master`**, followed by passing
-checks and the owner's merge decision. No PR into `dev` is required.
-`master` has no active deployment role. Production is a Terraform example/template,
-not a deployed environment or delivery pipeline.
+**Work/push on `dev` → validation → manual AWS DEV release.**
+Promote code with a PR from `dev` to protected `master`; `master` does not deploy.
+Only the owner has listed repository write/admin access. Production is an
+undeployed Terraform example/template, with no delivery pipeline.
 
-`dev` is published and is GitHub's default branch, with no branch protection.
-Repository write/admin access is limited to the owner account. `master` requires
-a PR and the `validate` status check, including for admins; force pushes and branch
-deletion are blocked. Required third-party approval count is zero because GitHub
-does not allow the solo owner to approve their own PR. The owner controls merges.
-The approved [OIDC trust update](aws-oidc.md) is applied and identity-tested.
+## Workflows
 
-## 1. Validate without AWS credentials
+| Workflow | Purpose |
+| --- | --- |
+| `validate.yml` | Terraform fmt/init-without-backend/validate/mock tests; app checks and local container tests. Runs on `dev` pushes and PRs targeting `master`, without AWS credentials. |
+| `dev-image.yml` | Manually build, test and publish a commit-tagged image to DEV ECR; wait for the scan and reject critical/high findings. |
+| `dev-deploy.yml` | Manually initialize DEV state, validate, plan and optionally apply. |
+| `aws-oidc-check.yml` | Identity-only check; no deployment. |
 
-`.github/workflows/validate.yml` runs on PRs targeting `master`, pushes to `dev` and
-manual dispatch. It checks
-Terraform formatting/validation/mock tests, application types/tests/build, local
-PostgreSQL integration and a non-root/read-only container smoke. It does not read
-remote state, obtain an OIDC token, publish images or deploy infrastructure.
+## Plan and apply
 
-## 2. Build and publish an immutable image
+The deployment workflow uses standard commands:
 
-The manually dispatched `dev-image.yml` runs only on `dev`, builds `app/` for linux/amd64, smoke-tests
-it and publishes a commit-tagged image to the dedicated DEV ECR repository.
-ECR tags are immutable. The workflow records the digest and requires a completed
-scan without critical/high findings. Application dependency checks are separate.
+```sh
+terraform init -backend-config=backend.hcl
+terraform validate
+terraform plan -var-file=release.tfvars.json -out=dev.tfplan
+terraform apply dev.tfplan
+```
 
-## 3. Review and apply a DEV service release
+Run `operation=plan`, review the changes and record the commit SHA shown in the
+summary. For an approved DEV apply, run `operation=apply` on the same revision and
+provide `reviewed_revision`. The job checks that SHA, generates a **fresh** saved
+plan and applies that runner-local plan. Plans/state are not published as artifacts.
 
-The manually dispatched `dev-deploy.yml` runs only on `dev` and uses an existing
-immutable image digest. For the running environment, use `phase=service`.
-Neither pushing to `dev` nor merging to `master` automatically builds an image,
-applies Terraform or runs a database migration.
+**Trade-off:** matching the code revision does not prove the fresh plan is identical
+to the earlier reviewed plan; remote drift may change it. The custom semantic-hash
+framework has been removed. Stronger production delivery would need a secure,
+exact reviewed-plan approval mechanism. This is a deliberately simple manual DEV
+pipeline, not a production approval guarantee.
 
-1. OIDC assumes the DEV-scoped AWS role; no permanent AWS keys are stored in GitHub.
-2. Initialize the DEV S3 backend with native locking.
-3. Reconstruct retained task-definition inputs so existing history is not deleted.
-4. Save a Terraform plan and audit DEV scope, ownership, no deletions/replacements
-   and no CI self-IAM changes. Review its summary and change fingerprint.
-5. An explicit apply invocation creates a fresh plan and requires the same reviewed
-   fingerprint, then applies that exact runner-local saved plan.
-6. Verify private DB access, run the idempotent migration, verify again and check
-   anonymous Clerk/API boundaries. Finish with a refreshed no-change plan.
+`release.tfvars.json` explicitly records the current image, public auth settings
+and retained task definitions. Historical data remains to avoid removing existing
+tracked records, but no Python script reconstructs it. Future releases must retain
+their predecessor's exact configuration; see [DEV inputs](../terraform/environments/dev/README.md).
 
-Both delivery workflows share a non-cancelling concurrency group. Terraform's
-state lock additionally protects state writers. PostgreSQL advisory locks protect
-migrations independently. Raw plans/state are not uploaded as ordinary artifacts.
+## What remains separate
 
-Terraform owns the ECS task definition and service. Only desired task count is
-ignored because autoscaling owns it; there is no competing CLI deployment owner.
+- New image publication and release-input changes require review; pushing code
+  does not automatically change AWS infrastructure.
+- The database is already initialized. Automatic bootstrap, migration and runtime
+  verification jobs have been removed from routine deployment. Schema changes
+  require a separate reviewed migration; image rollback cannot undo schema changes.
+- Google login/gallery/image operations need a manual browser check after release.
+- Restore, failover and load testing remain future operational work.
 
-## Identity and safety boundaries
-
-- The live OIDC trust accepts only this repository's immutable identity on `dev`,
-  not `master`, PR or protected-environment subjects. The approved change replaced
-  the previous exact `master` subject without changing permission policies.
-- Human-bootstrapped CI policies and task boundaries constrain DEV authority.
-  Actions cannot modify its own grants or restore retired bootstrap privilege.
-- Execution pulls images/writes logs; runtime reads its own secret and accesses
-  image objects; migration reads only the schema-owner secret.
-- Historical repair/optional recovery tooling and the workflow's one-off reset
-  input have been removed. Foundations/jobs remain for explaining initial setup,
-  not for rerunning against the live environment.
-- The old smoke-secret container and retained task definitions remain in Terraform
-  for state compatibility, not because Clerk requires them.
-
-Production has no deployment workflow or approved deployment role. It remains an
-example/template; any future launch would require a separately scoped identity,
-approval path and the gates in [production readiness](production-readiness.md).
-Never repoint the DEV workflow.
-
-Google login and authenticated image operations still need manual browser checks;
-anonymous smoke tests do not prove them. See [DEV status](dev-deployment.md).
-Detailed historical records are [archived](archive/delivery.md), not required study.
+OIDC still trusts only `dev`. The existing DEV role, permission policies,
+boundaries, resource names and backend key are unchanged. Terraform owns ECS
+configuration; autoscaling owns only desired task count. Image/deployment workflows
+share concurrency, and native S3 locking protects state writers.

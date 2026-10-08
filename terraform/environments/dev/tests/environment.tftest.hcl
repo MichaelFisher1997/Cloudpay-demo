@@ -18,3 +18,21 @@ run "dev_foundations_only" {
     error_message = "Default dev root must be dedicated, foundation-only, without a placeholder release."
   }
 }
+
+run "recorded_dev_release_preserves_existing_history" {
+  command = plan
+  variables {
+    release = jsondecode(file("release.tfvars.json")).release
+  }
+  assert {
+    condition = (
+      output.deployment.service_enabled &&
+      output.deployment.image_digest == "sha256:0b9490fbfef66443dbca66960709e4a7c2510890b50396423fcaf369915843d1" &&
+      length(output.deployment.retained_image_digests) == 3 &&
+      length(output.deployment.bootstrap_image_digests) == 1 &&
+      length(output.deployment.job_task_definitions) == 2 &&
+      !var.release.bootstrap_enabled
+    )
+    error_message = "The recorded release must preserve existing task history without restoring initialization privileges."
+  }
+}

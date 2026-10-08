@@ -32,8 +32,9 @@ When ready to promote the code: **PR from `dev` to protected `master` → checks
 - `dev` is the active/default development branch and permits direct pushes by
   the repository owner. No feature branch or PR into `dev` is required.
 - Validation runs on pushes to `dev` and PRs targeting `master`.
-- Manually run the image workflow on `dev`, then the DEV
-  deployment workflow: reviewed `service` plan followed by an explicit apply.
+- Manually run the image workflow on `dev`, review the digest in the committed
+  [DEV release inputs](terraform/environments/dev/README.md), then run the deployment
+  workflow: plan followed by an explicit apply at the reviewed code revision.
   Merging does not automatically change AWS infrastructure.
 - `master` is protected for code promotion, not AWS deployment. The branch name does not select
   a Terraform environment: deployment still uses `terraform/environments/dev/`
@@ -80,15 +81,28 @@ they are not required study. Existing task-history/state compatibility controls
 remain; cleanup has not changed Terraform resources, backend keys or IAM permission
 policies. Only the explicitly approved OIDC branch trust changed.
 
+There is no top-level custom deployment-script framework. Actions runs ordinary
+Terraform commands. Application-only test helpers live in `app/scripts/`.
+Release history is explicit input data, not a Python program. Automatic database
+jobs and semantic plan hashing have been removed; see [delivery trade-offs](docs/delivery.md).
+
 ## Local checks
 
-Terraform 1.16.5, AWS provider 6.67.0, Bun 1.4.2, Python 3 and Docker.
+Terraform 1.16.5, AWS provider 6.67.0, Bun 1.4.2 and Docker.
 The Nix shell supplies Terraform, actionlint and ShellCheck.
 
 ```sh
 nix-shell
-bash scripts/verify.sh
+terraform fmt -check -recursive terraform
+# For each root/module, initialize without the backend before local mock tests:
+terraform -chdir=terraform/modules/networking init -backend=false -lockfile=readonly
+terraform -chdir=terraform/modules/networking validate
+terraform -chdir=terraform/modules/networking test
 cd app
+bun install --frozen-lockfile
+bun run format:check
+bun run typecheck
+bun run test
 bun run test:built
 ```
 

@@ -4,10 +4,10 @@ import { resolve } from "node:path";
 
 const name = `godiffy-pg-test-${randomBytes(6).toString("hex")}`;
 const password = randomBytes(32).toString("base64url");
-const app = resolve(import.meta.dir, "../app");
+const app = resolve(import.meta.dir, "..");
 let created = false;
 const localEnv: Record<string, string | undefined> = {
-  ...Bun.env,
+  ...process.env,
   AWS_CONFIG_FILE: "/dev/null",
   AWS_SHARED_CREDENTIALS_FILE: "/dev/null",
   AWS_EC2_METADATA_DISABLED: "true",
@@ -28,16 +28,16 @@ for (const key of [
   delete localEnv[key];
 
 async function docker(args: string[], extraEnv: Record<string, string> = {}) {
-  const process = Bun.spawn(["docker", ...args], {
-    env: { ...Bun.env, ...extraEnv },
+  const child = Bun.spawn(["docker", ...args], {
+    env: { ...process.env, ...extraEnv },
     stdout: "pipe",
     stderr: "pipe",
   });
   const [output, status] = await Promise.all([
-    new Response(process.stdout).text(),
-    process.exited,
+    new Response(child.stdout).text(),
+    child.exited,
     // Drain without printing errors that might expose environment details.
-    new Response(process.stderr).text(),
+    new Response(child.stderr).text(),
   ]);
   if (status !== 0) throw new Error("Isolated Docker test operation failed");
   return output.trim();

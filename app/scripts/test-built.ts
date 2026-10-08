@@ -9,7 +9,7 @@ if (!(await Bun.file(resolve(app, ".output/server/index.mjs")).exists())) {
 // The repository's local-only runner owns its uniquely named PG17 container.
 // This process never receives AWS credentials or prints ephemeral test secrets.
 const runner = Bun.spawn(["bun", "scripts/test-database.ts"], {
-  cwd: resolve(app, ".."),
+  cwd: app,
   env: { ...process.env, BUILT_SMOKE: "1" },
   stdout: "inherit",
   stderr: "inherit",

@@ -39,13 +39,14 @@ upload/download/delete, plus rejection of an unapproved account; that proof is m
 ## Preserve the working deployment
 
 Terraform configuration and resource addresses are unchanged by the repository
-cleanup. The release-history helper, retired bootstrap role, IAM boundaries and
+cleanup. Explicit release-history inputs, the retired bootstrap role, IAM boundaries and
 legacy smoke-secret container remain because existing state tracks them.
 Removing those safely would require a separate reviewed migration/retirement.
 
-Use only reviewed `service` releases against the running DEV environment; do not
-rerun foundations/jobs or reactivate bootstrap. The workflow no longer exposes
-historical repair or data-reset inputs.
+Use the recorded `release.tfvars.json` inputs against the running DEV environment;
+do not use empty foundations-only defaults or reactivate bootstrap. The workflow
+now contains only plan/apply; no automatic initialization, migration, verification,
+historical repair or data reset. No deployment was performed during this cleanup.
 
 See [delivery](delivery.md), [Clerk access](clerk-dev.md), [costs](costs.md) and
 [archived deployment evidence](archive/dev-deployment.md) when needed.

@@ -94,7 +94,10 @@ client-side check. Both Clerk sign-up/sign-in and the API enforce the restrictio
    ```
 
 3. Add the same exact email to `allowedEmails` in `app/clerk/dev.runtime.json`.
-   Commit, publish a new image and use the reviewed Actions service release.
+    Update `release.clerk_auth.allowed_emails` in
+    `terraform/environments/dev/release.tfvars.json` too. Publish a new image,
+    update `release.image_digest` and use the reviewed Actions plan/apply workflow.
+    Preserve the old task-definition snapshots rather than editing them.
     Whitelist changes do not require a database reset.
 4. To revoke access, remove it from both layers; existing offline-verified tokens
    can last until their short expiry. Signed download URLs can last two minutes.

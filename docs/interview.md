@@ -21,7 +21,7 @@ The live OIDC trust matches only `dev`, and its identity-only Actions check pass
 | 6 | `terraform/modules/database/main.tf` | Isolated encrypted RDS, managed master password, empty app-secret containers, forced TLS, backups and deletion safeguards. |
 | 7 | `terraform/modules/application/iam.tf` | Trust versus permissions; execution versus runtime versus migration; least privilege and DEV permission boundaries. |
 | 8 | `terraform/modules/application/main.tf` | ECR digest, ALB/IP targets, Fargate task/service, rolling deployments, circuit breaker and autoscaling. |
-| 9 | `.github/workflows/validate.yml`, `dev-image.yml`, `dev-deploy.yml` | No-credential validation, OIDC/STS, immutable images, saved reviewed plans and Terraform ownership of releases. |
+| 9 | `.github/workflows/validate.yml`, `dev-image.yml`, `dev-deploy.yml` | No-credential validation, OIDC/STS, immutable images, manual plan/apply and Terraform ownership of releases. |
 | 10 | `terraform/modules/godiffy/monitoring.tf`, production root | What alarms/backups/HA achieve—and what needs real operational testing. |
 
 For each section, answer: **what does it do, why is it needed, what depends on it,
@@ -69,11 +69,13 @@ Health probes are process-only; backups are not proof of a successful restore.
 
 ## Supporting material—not the main walkthrough
 
-`ci.tf`, `aws/ci/`, plan auditing and retained task history protect the existing
-DEV deployment. Do not claim these are required by every production service.
-History remains to avoid changing tracked resources; removing it needs reviewed
-state migration. Historical repair/recovery scripts and old password smoke tools
-have been removed. Detailed deployment records are in `docs/archive/`.
+`ci.tf` and `aws/ci/` define the existing DEV permission boundaries. The custom
+Python deployment framework has been removed; workflows run ordinary Terraform
+commands. `release.tfvars.json` preserves exact existing task history as input
+data, not automation. Removing those records needs separate reviewed retirement.
+Apply re-plans at the reviewed code revision; code equality is not proof of identical
+plans under remote drift. Stronger production approval is a future improvement.
+Application tests live under `app/`; detailed deployment records are in `docs/archive/`.
 
 Use [DEV status](dev-deployment.md) for evidence, [delivery](delivery.md) for the
 pipeline, [costs](costs.md) for trade-offs and [production readiness](production-readiness.md)
