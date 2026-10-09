@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { SignIn, SignUp, UserButton, useAuth, useUser } from "@clerk/react";
 import { useEffect, useState } from "react";
 import { Sha256 } from "@aws-crypto/sha256-js";
+import { ImagePreview } from "../components/image-preview";
 export const Route = createFileRoute("/")({ component: Gallery });
 type Image = { id: string; name: string; status: string; created_at: string };
 function Gallery() {
@@ -181,8 +182,14 @@ function Gallery() {
           {images.length ? (
             <div className="grid">
               {images.map((image) => (
-                <article key={image.id}>
-                  <div className="placeholder">✦</div>
+                <article key={`${user.id}:${image.id}`}>
+                  {image.status === "ready" ? (
+                    <ImagePreview imageId={image.id} name={image.name} />
+                  ) : (
+                    <div className="placeholder preview-status">
+                      Processing image…
+                    </div>
+                  )}
                   <div className="details">
                     <div>
                       <strong>{image.name}</strong>
