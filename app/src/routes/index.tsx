@@ -3,6 +3,7 @@ import { SignIn, SignUp, UserButton, useAuth, useUser } from "@clerk/react";
 import { useEffect, useState } from "react";
 import { Sha256 } from "@aws-crypto/sha256-js";
 import { ImagePreview } from "../components/image-preview";
+import { ImageUpload } from "../components/image-upload";
 export const Route = createFileRoute("/")({ component: Gallery });
 type Image = { id: string; name: string; status: string; created_at: string };
 function Gallery() {
@@ -165,20 +166,8 @@ function Gallery() {
                 Private to your account. JPEG, PNG or WebP, up to 10 MiB.
               </p>
             </div>
-            <label className="upload">
-              {busy ? "Working…" : "＋ Add photos"}
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                disabled={busy}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) void upload(f);
-                  e.target.value = "";
-                }}
-              />
-            </label>
           </div>
+          <ImageUpload busy={busy} onUpload={upload} onError={setError} />
           {images.length ? (
             <div className="grid">
               {images.map((image) => (
