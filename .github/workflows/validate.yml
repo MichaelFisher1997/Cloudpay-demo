@@ -1,4 +1,4 @@
-name: Godiffy validation (no AWS deployment)
+name: Validate
 
 on:
   workflow_dispatch:

@@ -14,8 +14,10 @@ availability settings and explicit activation gates; it is **not deployed or
 operationally certified**. This code-only review does not authorize AWS, Clerk
 production, certificate, DNS, IAM or database changes.
 
-The production root now preserves Clerk and immutable release-history inputs.
-Production activation rejects missing auth/origin, development credentials,
+The production root is now a minimal module-reuse skeleton, with no release
+variables or activation inputs. It leaves the service and database jobs disabled.
+The shared modules retain their production behaviour and safety tests.
+Production activation within those modules rejects missing auth/origin, development credentials,
 mismatched key/issuer, mutable images, missing TLS, an unready database, active
 bootstrap privilege, missing alarm recipient or missing explicit review.
 Runtime preflight also checks the public RSA key and prohibits HTTP/local DB
@@ -47,10 +49,12 @@ are not added without a workload/threat requirement. There is no claim that ever
 production workload needs them. Account/region and resource names are deliberately
 fixed for this assessment rather than presented as a general-purpose AWS framework.
 
-## Required production inputs
+## Future production inputs — not exposed by the skeleton
 
-Use `terraform/environments/prod`, its separate backend key, and separately approved
-deployment identity. Defaults never enable jobs or the service.
+A real production root would need to expose the shared-module inputs below and
+use a separately approved deployment identity and state key. The current skeleton
+does not expose these inputs. Do not apply it: even with service/jobs disabled,
+it can propose creating billable foundation resources.
 
 | Input | Required value before service activation |
 | --- | --- |
@@ -109,7 +113,7 @@ required to demonstrate this Terraform in the interview.
 2. Show the thin roots and cohesive networking/storage/database/application modules.
 3. Compare production settings: TLS gate, two private replicas, Multi-AZ DB,
    endpoint redundancy, backup retention, alarms and deletion safeguards.
-4. Show production root/auth regression tests and CI: these are mock validations,
+4. Show the production skeleton test and shared-module auth tests: these are mock validations,
    not evidence of an AWS production deployment.
 5. Show the actual DEV release, no-change plan and gallery demonstration. Explain
    its HTTP/Single-AZ cost compromises and the concrete gates before production launch.

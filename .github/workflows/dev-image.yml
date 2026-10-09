@@ -1,4 +1,4 @@
-name: Godiffy DEV immutable image
+name: Publish DEV image
 on:
   workflow_dispatch:
 permissions:

@@ -2,7 +2,7 @@ locals {
   account_id = "218549829565"
   region     = "eu-west-2"
   name       = "godiffy-${var.environment}"
-  production = var.environment == "prod"
+  production = var.environment == "prod" # for this demo should always be false
   tags = {
     Project     = "godiffy"
     Environment = var.environment
@@ -16,7 +16,7 @@ module "networking" {
   name               = local.name
   vpc_cidr           = local.production ? "10.43.0.0/16" : "10.42.0.0/16"
   availability_zones = ["eu-west-2a", "eu-west-2b"]
-  endpoint_az_count  = local.production ? 2 : 1
+  endpoint_az_count  = local.production ? 2 : 1 # if prod use two endpoint othersie use one
   enable_http        = !local.production || var.certificate_arn != null
   image_bucket_arn   = "arn:aws:s3:::${local.name}-images-${local.account_id}-${local.region}"
   tags               = local.tags

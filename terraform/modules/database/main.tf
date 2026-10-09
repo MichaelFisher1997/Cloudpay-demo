@@ -1,3 +1,27 @@
+terraform {
+  required_version = ">= 1.16.0, < 1.17.0"
+  required_providers {
+    aws = { source = "hashicorp/aws", version = ">= 6.67.0, < 7.0.0" }
+  }
+}
+
+# Inputs from the environment's composition module.
+variable "name" { type = string }
+variable "subnet_ids" { type = list(string) }
+variable "security_group_id" { type = string }
+variable "production" { type = bool }
+variable "tags" { type = map(string) }
+variable "final_snapshot_suffix" {
+  type        = string
+  description = "Set a unique, reviewed suffix before any approved retirement; never silently skip the final snapshot."
+  default     = "review-required"
+  validation {
+    condition     = can(regex("^[a-z0-9][a-z0-9-]{0,59}[a-z0-9]$", var.final_snapshot_suffix))
+    error_message = "Snapshot suffix must contain 2-61 lowercase alphanumeric/hyphen characters with alphanumeric ends."
+  }
+}
+
+# Private placement, PostgreSQL settings and logs.
 resource "aws_db_subnet_group" "this" {
   name       = "${var.name}-database"
   subnet_ids = var.subnet_ids
@@ -30,6 +54,7 @@ resource "aws_cloudwatch_log_group" "postgresql" {
   tags              = var.tags
 }
 
+# RDS instance: Single-AZ in DEV, Multi-AZ in the production template.
 resource "aws_db_instance" "this" {
   identifier                          = "${var.name}-postgres"
   engine                              = "postgres"
@@ -68,7 +93,8 @@ resource "aws_db_instance" "this" {
   depends_on = [aws_cloudwatch_log_group.postgresql]
 }
 
-# Terraform owns containers/metadata only; one-off jobs write values directly to AWS.
+# Secret containers only: initialization wrote values outside Terraform.
+# Routine deployment does not run initialization or database migrations.
 resource "aws_secretsmanager_secret" "runtime" {
   name                    = "${var.name}-runtime"
   description             = "Godiffy restricted DB credentials and authentication signing secret"
@@ -88,3 +114,10 @@ resource "aws_secretsmanager_secret" "migration" {
     prevent_destroy = true
   }
 }
+
+# Identifiers passed to the application module; no secret values.
+output "host" { value = aws_db_instance.this.address }
+output "identifier" { value = aws_db_instance.this.identifier }
+output "runtime_secret_arn" { value = aws_secretsmanager_secret.runtime.arn }
+output "migration_secret_arn" { value = aws_secretsmanager_secret.migration.arn }
+output "master_secret_arn" { value = one(aws_db_instance.this.master_user_secret).secret_arn }

@@ -1,3 +1,5 @@
+# Inputs supplied by modules/godiffy/main.tf; this module creates application
+# resources using existing networking/database identifiers, not duplicate ones.
 variable "name" { type = string }
 variable "account_id" { type = string }
 variable "production" { type = bool }
@@ -6,6 +8,7 @@ variable "task_permissions_boundaries" {
   type    = map(string)
   default = {}
 }
+# Object groups the subnet and security-group identifiers used by ALB and ECS.
 variable "network" {
   type = object({
     vpc_id            = string
@@ -15,6 +18,7 @@ variable "network" {
     task_sg_id        = string
   })
 }
+# Secret ARNs are identifiers, never secret values or database passwords.
 variable "database" {
   type = object({
     host                 = string
@@ -30,6 +34,7 @@ variable "alb_log_bucket" {
   default  = null
   nullable = true
 }
+# Optional HTTPS integration; null keeps the default DEV ALB HTTP origin.
 variable "app_url" {
   type     = string
   default  = null
@@ -58,7 +63,7 @@ variable "https_redirect_enabled" {
 }
 variable "invited_emails" {
   type        = list(string)
-  description = "Dev-only test-account allowlist; visible in state/task config, not a verified invitation mechanism."
+  description = "Legacy DEV password-auth setting retained for compatibility; current Clerk access uses release.clerk_auth.allowed_emails."
   default     = []
   validation {
     condition = (
@@ -68,6 +73,8 @@ variable "invited_emails" {
     error_message = "Use valid dev test addresses only; production registration awaits a verified invitation design."
   }
 }
+# Current image/auth settings plus retained task history. optional(type, default)
+# allows omitted fields; validation rejects unsafe combinations before deployment.
 variable "release" {
   type = object({
     image_digest                     = optional(string)
@@ -86,6 +93,7 @@ variable "release" {
     database_ready     = optional(bool, false)
   })
   default = {}
+  # Check public Clerk configuration and named emails, not live login success.
   validation {
     condition = var.release.clerk_auth == null ? true : (
       startswith(var.release.clerk_auth.publishable_key, var.production ? "pk_live_" : "pk_test_") &&
@@ -106,6 +114,7 @@ variable "release" {
     )
     error_message = "Production service activation requires explicit Clerk live configuration and an HTTPS application origin."
   }
+  # Require digest-pinned images instead of mutable tags such as "latest".
   validation {
     condition = (
       var.release.image_digest == null ||
@@ -130,6 +139,7 @@ variable "release" {
     )
     error_message = "An actual image digest is required before enabling service or bootstrap jobs."
   }
+  # database_ready is an operator acknowledgment, not an actual DB connectivity test.
   validation {
     condition     = !var.release.service_enabled || (var.release.database_ready && !var.release.bootstrap_enabled)
     error_message = "Service activation needs confirmed DB initialization/migrations and removal of standing bootstrap access."

@@ -1,3 +1,5 @@
+# Return identifiers to the composition module, not secret values.
+# Storage uses origin for CORS; monitoring uses ALB/target-group ARN suffixes.
 output "origin" { value = local.origin }
 output "alb_dns_name" { value = aws_lb.this.dns_name }
 output "alb_zone_id" { value = aws_lb.this.zone_id }
@@ -6,6 +8,8 @@ output "target_group_arn_suffix" { value = aws_lb_target_group.this.arn_suffix }
 output "repository_url" { value = aws_ecr_repository.this.repository_url }
 output "cluster_name" { value = aws_ecs_cluster.this.name }
 output "service_name" { value = var.release.service_enabled ? aws_ecs_service.this[0].name : null }
+# Filter "digest/kind" keys to report only the current image's job recipes.
+# Reporting a definition does not start that task.
 output "job_task_definitions" { value = { for key, job in local.job_definitions : job.kind => aws_ecs_task_definition.job[key].arn if split("/", key)[0] == var.release.image_digest } }
 output "retained_image_digests" { value = local.release_digests }
 output "bootstrap_image_digests" { value = toset([for key, job in local.job_definitions : split("/", key)[0] if job.kind == "bootstrap"]) }

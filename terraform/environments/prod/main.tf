@@ -1,3 +1,5 @@
+# Undeployed module-reuse example, not a production delivery configuration.
+# An apply could still create foundations; no production apply is authorised.
 terraform {
   required_version = "~> 1.16.0"
   backend "s3" {}
@@ -12,18 +14,12 @@ provider "aws" {
 }
 
 module "godiffy" {
-  source                 = "../../modules/godiffy"
-  environment            = "prod"
-  release                = var.release
-  app_url                = var.app_url
-  certificate_arn        = var.certificate_arn
-  alarm_email            = var.alarm_email
-  production_reviewed    = var.production_reviewed
-  https_redirect_enabled = var.https_redirect_enabled
-  final_snapshot_suffix  = var.final_snapshot_suffix
+  source      = "../../modules/godiffy"
+  environment = "prod"
+  # Module defaults leave the service and database jobs disabled.
 }
 
 output "deployment" {
-  description = "Dedicated Godiffy production integration details, not credentials."
+  description = "Example production foundation identifiers; this environment is not deployed."
   value       = module.godiffy.deployment
 }

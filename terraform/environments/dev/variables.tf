@@ -1,5 +1,5 @@
 variable "release" {
-  description = "Default foundations only. Enable jobs/service incrementally with reviewed real image digest."
+  description = "Live DEV deployment uses release.tfvars.json explicitly; empty defaults are for foundation-only tests, not the running service."
   type = object({
     image_digest                     = optional(string)
     retained_image_digests           = optional(set(string), [])
@@ -35,6 +35,7 @@ variable "https_redirect_enabled" {
   default = false
 }
 variable "invited_emails" {
+  # Legacy password-auth compatibility; current access uses release.clerk_auth.allowed_emails.
   type    = list(string)
   default = []
 }

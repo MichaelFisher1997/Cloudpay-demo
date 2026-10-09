@@ -1,4 +1,4 @@
-name: Godiffy DEV deployment
+name: Plan / apply DEV infrastructure
 
 on:
   workflow_dispatch:

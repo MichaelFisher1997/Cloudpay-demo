@@ -37,7 +37,7 @@ variable "release" {
 variable "app_url" {
 
   type        = string
-  description = "Approved HTTPS origin at the final integration stage; null uses dev ALB HTTP."
+  description = "Optional approved HTTPS origin; null uses the DEV ALB's HTTP address."
   default     = null
   nullable    = true
   validation {
@@ -87,6 +87,7 @@ variable "https_redirect_enabled" {
   default = false
 }
 variable "invited_emails" {
+  # Legacy password-auth compatibility; current access uses release.clerk_auth.allowed_emails.
   type    = list(string)
   default = []
 }
