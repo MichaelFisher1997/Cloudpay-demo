@@ -48,6 +48,18 @@ jobs:
       - name: Require a completed OS scan without critical or high findings
         run: |
           digest=$(jq -r '.digest' image.json)
+          # ECR may briefly report no scan immediately after an image push.
+          # Wait for registration; other AWS errors must still fail the job.
+          for attempt in {1..30}; do
+            if aws ecr describe-image-scan-findings --repository-name godiffy-dev-application --image-id "imageDigest=$digest" --output json > image-scan.json 2> scan-error.txt; then
+              break
+            fi
+            if ! grep -q 'ScanNotFoundException' scan-error.txt || [ "$attempt" -eq 30 ]; then
+              cat scan-error.txt >&2
+              exit 1
+            fi
+            sleep 5
+          done
           aws ecr wait image-scan-complete --repository-name godiffy-dev-application --image-id "imageDigest=$digest"
           aws ecr describe-image-scan-findings --repository-name godiffy-dev-application --image-id "imageDigest=$digest" --output json | jq -e '.imageScanStatus.status == "COMPLETE" and .imageScanFindings != null and ((.imageScanFindings.findingSeverityCounts.CRITICAL // 0) == 0) and ((.imageScanFindings.findingSeverityCounts.HIGH // 0) == 0)' > /dev/null
           echo 'ECR scan complete; no critical/high findings' >> "$GITHUB_STEP_SUMMARY"

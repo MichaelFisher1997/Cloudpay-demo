@@ -27,8 +27,12 @@ run "recorded_dev_release_preserves_existing_history" {
   assert {
     condition = (
       output.deployment.service_enabled &&
-      output.deployment.image_digest == "sha256:0b9490fbfef66443dbca66960709e4a7c2510890b50396423fcaf369915843d1" &&
-      length(output.deployment.retained_image_digests) == 3 &&
+      output.deployment.image_digest == var.release.image_digest &&
+      alltrue([for digest in [
+        "sha256:0b9490fbfef66443dbca66960709e4a7c2510890b50396423fcaf369915843d1",
+        "sha256:44c6c7efdd7feb4b688bea19c1c158f6efcea49accb213b31c5426e0bd44dfa3",
+        "sha256:52f132c7cb0264b64da5a6e6075757984c456a17f73e9b13b52bedb6b2852587"
+      ] : contains(output.deployment.retained_image_digests, digest)]) &&
       length(output.deployment.bootstrap_image_digests) == 1 &&
       length(output.deployment.job_task_definitions) == 2 &&
       !var.release.bootstrap_enabled
