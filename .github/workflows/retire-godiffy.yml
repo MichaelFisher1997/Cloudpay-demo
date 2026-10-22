@@ -1,0 +1,73 @@
+name: Retire approved Godiffy AWS resources
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        type: choice
+        options: [plan, destroy]
+        default: plan
+        required: true
+      reviewed_revision:
+        type: string
+        description: Exact reviewed commit SHA containing the retirement workflow
+        required: true
+      confirmation:
+        type: string
+        description: For destroy only, enter DELETE GODIFFY 218549829565
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: godiffy-dev-deployment
+  cancel-in-progress: false
+
+jobs:
+  retire:
+    if: github.repository == 'MichaelFisher1997/Cloudpay-demo' && github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    env:
+      AWS_REGION: eu-west-2
+      AWS_PAGER: ""
+      AWS_MAX_ATTEMPTS: "5"
+      TF_IN_AUTOMATION: "true"
+      TF_WORKSPACE: default
+      REVIEWED_REVISION: ${{ inputs.reviewed_revision }}
+      RETIREMENT_CONFIRMATION: ${{ inputs.confirmation }}
+      RETIREMENT_OPERATION: ${{ inputs.operation }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: 1.16.5
+          terraform_wrapper: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.4.2
+      - name: Check the destructive guard without AWS credentials
+        run: |
+          bun test aws/retirement/guards.test.ts
+          bun -e 'import {assertExecutionContext} from "./aws/retirement/guards"; assertExecutionContext(process.env, process.env.RETIREMENT_OPERATION ?? "");'
+      - name: Authenticate the temporary retirement role
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          aws-region: eu-west-2
+          role-to-assume: arn:aws:iam::218549829565:role/godiffy-retirement-runner
+          allowed-account-ids: "218549829565"
+          role-duration-seconds: 3600
+          unset-current-credentials: true
+      - name: Plan or execute the explicitly approved retirement
+        run: bun run aws/retirement/retire.ts "$RETIREMENT_OPERATION"

@@ -1,0 +1,27 @@
+{
+  "account": "218549829565",
+  "region": "eu-west-2",
+  "repository": "MichaelFisher1997/Cloudpay-demo",
+  "branch": "dev",
+  "runnerRole": "godiffy-retirement-runner",
+  "devStateFingerprint": "30212a5ed458b888ac688653cde7922d1449d43aa467c2fdf148379046ae801c",
+  "bootstrapStateFingerprint": "01ca4d971db0477a450221089192ca89018e46935d848f8566ee832391021e0d",
+  "stateBucket": "godiffy-terraform-state-218549829565-eu-west-2",
+  "imagesBucket": "godiffy-dev-images-218549829565-eu-west-2",
+  "database": "godiffy-dev-postgres",
+  "databaseResourceId": "db-VB3I4GEGRPSJIKUXZCQBJGIR4I",
+  "cluster": "godiffy-dev-cluster",
+  "service": "godiffy-dev-web",
+  "containerRepository": "godiffy-dev-application",
+  "vpc": "vpc-02dac5fbf726a3b9b",
+  "loadBalancerArn": "arn:aws:elasticloadbalancing:eu-west-2:218549829565:loadbalancer/app/godiffy-dev-alb/a9c448cc93cbeca7",
+  "deploymentRole": "cloudpay-demo-github-actions",
+  "taskFamilies": ["godiffy-dev-bootstrap", "godiffy-dev-migrate", "godiffy-dev-verify", "godiffy-dev-web"],
+  "secretArns": [
+    "arn:aws:secretsmanager:eu-west-2:218549829565:secret:godiffy-dev-runtime-w0okCR",
+    "arn:aws:secretsmanager:eu-west-2:218549829565:secret:godiffy-dev-migration-GeYnnZ",
+    "arn:aws:secretsmanager:eu-west-2:218549829565:secret:godiffy-dev-smoke-fixtures-3ePOtZ"
+  ],
+  "roles": ["cloudpay-demo-github-actions", "godiffy-dev-bootstrap", "godiffy-dev-execution", "godiffy-dev-migration", "godiffy-dev-runtime"],
+  "policies": ["godiffy-dev-boundary-bootstrap", "godiffy-dev-boundary-execution", "godiffy-dev-boundary-migration", "godiffy-dev-boundary-runtime", "godiffy-dev-ci-control", "godiffy-dev-ci-data", "godiffy-dev-ci-iam", "godiffy-dev-ci-network", "godiffy-dev-ci-services"]
+}
