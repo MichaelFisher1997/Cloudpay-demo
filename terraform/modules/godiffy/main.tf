@@ -47,7 +47,7 @@ module "application" {
   account_id                  = local.account_id
   production                  = local.production
   release                     = var.release
-  app_url                     = local.production ? coalesce(var.app_url, "https://godiffy.com") : var.app_url
+  app_url                     = local.production ? coalesce(var.app_url, "https://godiffy.com") : var.app_url # domain not inplace
   certificate_arn             = var.certificate_arn
   https_redirect_enabled      = var.https_redirect_enabled
   invited_emails              = var.invited_emails
