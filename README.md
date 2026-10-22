@@ -1,5 +1,12 @@
 # Godiffy — CloudPay Terraform assessment
 
+> **AWS demo retired on 2026-10-22.** The application, database/backups, images,
+> Terraform-state bucket and dedicated IAM resources were removed with owner
+> approval. AWS delivery/authentication workflows are disabled; source and local
+> backups remain. The architecture and delivery notes below describe the former
+> deployment. See the [retirement record](docs/godiffy-retirement.md) for verification
+> and AWS-managed deletion/recovery metadata that has not yet expired.
+
 A small image gallery demonstrating the assessment: **an AWS web service with a
 PostgreSQL backend and access to a private S3 bucket**, managed with Terraform.
 The infrastructure is the focus; the application proves the components work together.
@@ -64,7 +71,7 @@ app/                              Small containerised gallery
 
 ## Deployment status and trade-offs
 
-**DEV runs:** http://godiffy-dev-alb-1345285825.eu-west-2.elb.amazonaws.com
+**Former DEV URL (retired):** http://godiffy-dev-alb-1345285825.eu-west-2.elb.amazonaws.com
 
 - One task, Single-AZ RDS and one endpoint AZ deliberately reduce demo cost.
 - **HTTP-only DEV is not production-ready.** Gallery bearer tokens cross HTTP;
@@ -73,7 +80,7 @@ app/                              Small containerised gallery
   dual-AZ endpoints, Multi-AZ RDS, longer retention and TLS activation guards.
 - ALB-to-task traffic remains HTTP in both designs. Restore/failover/load testing
   and confirmed alert delivery are not claimed.
-- DEV cost estimate: **$100–170/month**, not a measured bill or hard cap.
+- Historical DEV cost estimate: **$100–170/month**, not a measured bill or hard cap.
 
 See [DEV evidence](docs/dev-deployment.md), [costs](docs/costs.md) and
 [Clerk access](docs/clerk-dev.md). Historical delivery records are in `docs/archive/`;

@@ -1,5 +1,38 @@
 # Approved complete Godiffy retirement — 2026-10-22
 
+## Verified outcome
+
+[The final Actions cleanup succeeded](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/39867454112).
+Independent AWS SDK verification completed at **2026-10-22 22:53 UTC**, after SSO
+removed the temporary runner role and its three dedicated managed policies.
+
+- The PostgreSQL instance, parameter/subnet groups, snapshots and retained
+  automated backups are absent. No final snapshot was retained.
+- Both S3 buckets, all image/state versions, ECR repository/images, ALB, application
+  VPC/network interfaces, running ECS cluster, logs, alarms and SNS topic are gone.
+- The five original project roles and nine managed policies are absent, along with
+  the temporary runner role and its three policies.
+- All 16 task-definition revisions are non-runnable and in AWS-managed
+  `DELETE_IN_PROGRESS`; this is pending metadata, not running compute.
+- The runtime, migration and smoke secrets are marked for deletion with their
+  configured seven-day recovery windows. Their values are inaccessible while
+  marked for deletion; [AWS does not charge for these marked secrets](https://docs.aws.amazon.com/secretsmanager/latest/userguide/manage_delete-secret.html).
+- Tagged-resource checks covered all 17 enabled regions. Tag indexes still surfaced
+  known deleted network/ECS entries; direct service checks confirmed the resources
+  were absent or in the asynchronous states above. A tag-index entry is not proof
+  of an active resource.
+- Shared GitHub OIDC, human SSO and the RDS/autoscaling service-linked roles remain.
+  Unrelated resources and local files/backups were not deleted. The existing local
+  Terraform comment edit was not committed.
+- AWS image, deployment, identity-check and retirement workflows are disabled.
+  Credential-free `Validate` remains enabled.
+
+The old remote backend no longer exists. Do not run historical deployment or
+teardown commands against it. This is **not an empty-account claim**: unrelated
+resources and the explicitly retained/recoverable AWS metadata remain.
+
+## Approved scope
+
 The owner approved removing **all dedicated Godiffy AWS resources and data** in
 account `218549829565`, London (`eu-west-2`), through GitHub Actions. This is a new
 complete-retirement approval, not the limited retention scenario in `teardown.md`.
