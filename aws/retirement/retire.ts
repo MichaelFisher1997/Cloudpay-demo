@@ -206,7 +206,9 @@ function deleteTaskDefinitionHistory(): void {
   const definitions: string[] = [];
   for (const family of scope.taskFamilies) {
     const active = aws<{ taskDefinitionArns?: string[] }>("ecs", "list-task-definitions", ["--family-prefix", family, "--status", "ACTIVE"]);
-    for (const arn of active.taskDefinitionArns ?? []) aws("ecs", "deregister-task-definition", ["--task-definition", arn]);
+    // This API has no resource-level IAM support. The owner separately approved
+    // exact-ARN human SSO deregistration; never broaden the runner to Resource:*.
+    if (active.taskDefinitionArns?.length) throw new Error("Approved task revisions must be deregistered through the separately approved exact-ARN SSO step before Actions deletes their history");
     const inactive = aws<{ taskDefinitionArns?: string[] }>("ecs", "list-task-definitions", ["--family-prefix", family, "--status", "INACTIVE"]);
     definitions.push(...(inactive.taskDefinitionArns ?? []));
   }
@@ -214,14 +216,14 @@ function deleteTaskDefinitionHistory(): void {
     const result = aws<{ failures?: unknown[] }>("ecs", "delete-task-definitions", ["--task-definitions", ...definitions.slice(offset, offset + 10)]);
     if (result.failures?.length) throw new Error("ECS refused task-definition history deletion");
   }
-  note(`- Requested permanent deletion of ${definitions.length} inactive task definitions; AWS may retain DELETION_IN_PROGRESS metadata temporarily.`);
+  note(`- Requested permanent deletion of ${definitions.length} inactive task definitions; AWS may retain DELETE_IN_PROGRESS metadata temporarily.`);
 }
 
 function assertAbsent<T>(service: string, operation: string, args: string[], absent: string[]): void {
   if (optionalAws<T>(service, operation, args, absent) !== undefined) throw new Error(`Resource still exists: ${service} ${operation}`);
 }
 
-function verifyRetirement(): void {
+function verifyRetirement(includeIam = true): void {
   assertAbsent("rds", "describe-db-instances", ["--db-instance-identifier", scope.database], ["DBInstanceNotFound"]);
   const snapshots = aws<{ DBSnapshots?: unknown[] }>("rds", "describe-db-snapshots", ["--db-instance-identifier", scope.database]);
   if (snapshots.DBSnapshots?.length) throw new Error("Godiffy database snapshots remain");
@@ -231,8 +233,10 @@ function verifyRetirement(): void {
   if (vpcs.Vpcs?.length) throw new Error("Approved Godiffy VPC still exists");
   assertAbsent("ecr", "describe-repositories", ["--registry-id", scope.account, "--repository-names", scope.containerRepository], ["RepositoryNotFoundException"]);
   assertAbsent("elbv2", "describe-load-balancers", ["--load-balancer-arns", scope.loadBalancerArn], ["LoadBalancerNotFound"]);
-  for (const role of scope.roles) assertAbsent("iam", "get-role", ["--role-name", role], ["NoSuchEntity"]);
-  for (const policy of scope.policies) assertAbsent("iam", "get-policy", ["--policy-arn", `arn:aws:iam::${scope.account}:policy/${policy}`], ["NoSuchEntity"]);
+  if (includeIam) {
+    for (const role of scope.roles) assertAbsent("iam", "get-role", ["--role-name", role], ["NoSuchEntity"]);
+    for (const policy of scope.policies) assertAbsent("iam", "get-policy", ["--policy-arn", `arn:aws:iam::${scope.account}:policy/${policy}`], ["NoSuchEntity"]);
+  }
   for (const family of scope.taskFamilies) {
     const active = aws<{ taskDefinitionArns?: unknown[] }>("ecs", "list-task-definitions", ["--family-prefix", family, "--status", "ACTIVE"]);
     if (active.taskDefinitionArns?.length) throw new Error("Runnable Godiffy task definitions remain");
@@ -251,7 +255,7 @@ function verifyRetirement(): void {
     if (secret && !secret.DeletedDate) throw new Error("A project secret is not scheduled for deletion");
     note(`- Secret ${arn.split(":secret:")[1]}: ${secret ? `scheduled for deletion ${secret.DeletedDate}` : "deleted"}.`);
   }
-  note("- Verified database, snapshots, backups, VPC, ECR, ALB, ECS, project IAM, alarms, logs and SNS retirement.");
+  note(`- Verified database, snapshots, backups, VPC, ECR, ALB, ECS, ${includeIam ? "project IAM, " : ""}alarms, logs and SNS retirement.`);
 }
 
 function main(): void {
@@ -261,7 +265,12 @@ function main(): void {
     throw new Error("Retirement requires the exact approved AWS account and temporary runner role");
   }
   assertDeliveryFrozen();
-  assertBucket(scope.imagesBucket, "dev");
+  if (scope.resumeAfterApplicationRetirement) {
+    assertAbsent("s3api", "head-bucket", ["--bucket", scope.imagesBucket, "--expected-bucket-owner", scope.account], ["404", "NoSuchBucket", "NotFound"]);
+    verifyRetirement(false);
+  } else {
+    assertBucket(scope.imagesBucket, "dev");
+  }
   assertBucket(scope.stateBucket, "bootstrap");
   assertNoBackendLocks();
   const temporary = mkdtempSync(join(process.env.RUNNER_TEMP ?? "/tmp", "godiffy-retirement-"));
@@ -293,19 +302,23 @@ function main(): void {
   createPlan(dev, "preflight-full-dev", approvedDev);
   const bootstrapPlan = createPlan(bootstrap, "bootstrap-retirement", approvedBootstrap);
   if (mode === "plan") {
-    note("- Additional approved steps: stop tasks; delete PostgreSQL without final/retained automated backups; purge both versioned buckets and ECR; delete inactive task history and the old deployment role.");
+    note(scope.resumeAfterApplicationRetirement
+      ? "- Resuming only the verified remaining slice: delete inactive task history, dedicated IAM and all backend versions/bucket; application/data retirement is already independently verified."
+      : "- Additional approved steps: stop tasks; delete PostgreSQL without final/retained automated backups; purge both versioned buckets and ECR; delete inactive task history and the old deployment role.");
     note("- No application/data deletions were executed. Private plans/state were not uploaded.");
     return;
   }
   assertDeliveryFrozen();
-  stopApplication();
-  deleteDatabase();
-  const applicationResources = approvedDev.filter(({ address }) => address.startsWith("module.godiffy.") || address === "aws_secretsmanager_secret.smoke");
-  const applicationPlan = createPlan(dev, "application-retirement", applicationResources, ["module.godiffy", "aws_secretsmanager_secret.smoke"]);
-  clearBucket(scope.imagesBucket, "dev", temporary);
-  clearContainerImages(temporary);
-  note("- Applying the guarded application retirement plan.");
-  terraform(dev, ["apply", "-input=false", "-no-color", applicationPlan]);
+  if (!scope.resumeAfterApplicationRetirement) {
+    stopApplication();
+    deleteDatabase();
+    const applicationResources = approvedDev.filter(({ address }) => address.startsWith("module.godiffy.") || address === "aws_secretsmanager_secret.smoke");
+    const applicationPlan = createPlan(dev, "application-retirement", applicationResources, ["module.godiffy", "aws_secretsmanager_secret.smoke"]);
+    clearBucket(scope.imagesBucket, "dev", temporary);
+    clearContainerImages(temporary);
+    note("- Applying the guarded application retirement plan.");
+    terraform(dev, ["apply", "-input=false", "-no-color", applicationPlan]);
+  }
   deleteTaskDefinitionHistory();
   const iamPlan = createPlan(dev, "dev-iam-retirement", approvedDev);
   terraform(dev, ["apply", "-input=false", "-no-color", iamPlan]);

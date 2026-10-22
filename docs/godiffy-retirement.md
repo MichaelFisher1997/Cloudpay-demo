@@ -20,8 +20,12 @@ SSO-bootstrapped runner role uses the existing exact repository/branch OIDC trus
 and time-limited, project-scoped retirement permissions. SSO removes **that temporary
 runner role last**, after the Actions job, so it cannot revoke its own authority.
 
-`aws/retirement/scope.json` fingerprints the approved 111 DEV and six bootstrap
-Terraform resource identities. The job refuses a different inventory, unapproved
+`aws/retirement/scope.json` initially fingerprinted the approved 111 DEV and six
+bootstrap Terraform resource identities. After the application retirement, the
+remaining 14 DEV identities were independently verified as an exact subset of
+those original 111. The manifest now fingerprints that remaining slice while
+preserving the original fingerprint and six-resource bootstrap fingerprint.
+The job refuses a different inventory, unapproved
 plan IDs, creates/updates/replacements, another account, another branch/repository,
 or a missing explicit destroy confirmation. Delivery workflows must be disabled
 and have no running, queued, waiting or pending runs.
@@ -43,3 +47,19 @@ reset state, broaden permissions, or blindly rerun a mismatched inventory.
 After deletion, verify the application/database/networking/storage/IAM absence;
 record any Secrets Manager recovery dates or ECS metadata still deleting. An
 AWS-managed asynchronous deletion is not proof that its metadata has vanished.
+
+## Scoped recovery after the application retirement
+
+[The first destructive run](https://github.com/MichaelFisher1997/Cloudpay-demo/actions/runs/39859559894)
+removed the database/backups, images and application infrastructure, then stopped
+at ECS task-history deregistration. AWS requires `Resource: "*"` for
+`ecs:DeregisterTaskDefinition` and does not support ARN/tag scoping for that action.
+The runner was **not** granted that broader permission.
+
+The owner explicitly approved using the existing human SSO session to deregister
+only the 16 original revisions across `godiffy-dev-{bootstrap,migrate,verify,web}`.
+Their exact ARNs and ownership tags were checked before deregistration. Actions
+then resumes permanent deletion of those inactive revisions, the remaining IAM
+slice and the backend bucket. Resume mode independently verifies the prior
+application deletion and requires the exact remaining-state fingerprint; it does
+not restore, reset or remove records from Terraform state manually.
