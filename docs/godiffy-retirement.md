@@ -14,7 +14,8 @@ complete-retirement approval, not the limited retention scenario in `teardown.md
 
 ## Execution boundary
 
-`retire-godiffy.yml` is manual, DEV-branch-only and revision-pinned. A temporary
+`retire-godiffy.yml` deletion is manual, DEV-branch-only and revision-pinned. Changes
+to the retirement files run a read-only plan automatically, never deletion. A temporary
 SSO-bootstrapped runner role uses the existing exact repository/branch OIDC trust
 and time-limited, project-scoped retirement permissions. SSO removes **that temporary
 runner role last**, after the Actions job, so it cannot revoke its own authority.

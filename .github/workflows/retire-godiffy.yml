@@ -1,6 +1,11 @@
 name: Retire approved Godiffy AWS resources
 
 on:
+  push:
+    branches: [dev]
+    paths:
+      - .github/workflows/retire-godiffy.yml
+      - aws/retirement/**
   workflow_dispatch:
     inputs:
       operation:
@@ -42,9 +47,9 @@ jobs:
       AWS_MAX_ATTEMPTS: "5"
       TF_IN_AUTOMATION: "true"
       TF_WORKSPACE: default
-      REVIEWED_REVISION: ${{ inputs.reviewed_revision }}
+      REVIEWED_REVISION: ${{ github.event_name == 'push' && github.sha || inputs.reviewed_revision }}
       RETIREMENT_CONFIRMATION: ${{ inputs.confirmation }}
-      RETIREMENT_OPERATION: ${{ inputs.operation }}
+      RETIREMENT_OPERATION: ${{ github.event_name == 'push' && 'plan' || inputs.operation }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
